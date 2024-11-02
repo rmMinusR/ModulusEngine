@@ -30,6 +30,9 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             for i in symbolsToRemove:
                 this.module.remove(i)
 
+        # Set DI hook
+        this.module.findExternal = this.__tryFindExternal
+
         # Do parsing of outdated/new symbols
         for source in this.diff.outdated+this.diff.new:
             config.logger.info(f"Parsing {source}")
@@ -37,7 +40,10 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
                 # Only capture what's in the current file
                 cursorFilePath = cursor.location.file.name.replace(os.altsep, os.sep)
                 try:
-                    if source.path == cursorFilePath: this.__ingestCursor(None, cursor)
+                    if source.path == cursorFilePath:
+                        this.__ingestCursor(None, cursor)
+                    else:
+                        this.__ingestExternal(None, cursor)
                 except:
                     config.logger.critical(f"While parsing file {source.path}")
                     raise
@@ -61,24 +67,27 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
     factory_t = typing.Callable[[cx_ast.SymbolPath, Cursor, cx_ast.ASTNode, cx_ast.Module, Project], cx_ast.ASTNode|None]
     factories:dict[CursorKind, factory_t] = dict()
 
+    def __cursorPath(this, parent:cx_ast.ASTNode, cursor:Cursor) -> cx_ast.SymbolPath:
+        try:
+            if parent != None:
+                # Nested symbol
+                return parent.path+cursor.spelling
+            elif cursor.semantic_parent.kind != CursorKind.TRANSLATION_UNIT:
+                # Namespaced globals/statics defined outside their
+                # container need to have their paths fixed
+                return _make_FullyQualifiedPath(cursor)
+            else:
+                # Non-namespaced non-class-static global
+                return cx_ast.SymbolPath()+cursor.spelling
+        except:
+            config.logger.critical(f"While detecting path for symbol {cursor.displayname} at {makeSourceLocation(cursor, this.project)}")
+            raise        
+
     def __ingestCursor(this, parent:cx_ast.ASTNode, cursor:Cursor) -> cx_ast.ASTNode|None:
         # No need to check if it's ours: we're guaranteed it is, if a parent is
         kind = cursor.kind
         if kind in ClangParseContext.factories.keys():
-            try:
-                if parent != None:
-                    # Nested symbol
-                    path = parent.path+cursor.spelling
-                elif cursor.semantic_parent.kind != CursorKind.TRANSLATION_UNIT:
-                    # Namespaced globals/statics defined outside their
-                    # container need to have their paths fixed
-                    path = _make_FullyQualifiedPath(cursor)
-                else:
-                    # Non-namespaced non-class-static global
-                    path = cx_ast.SymbolPath()+cursor.spelling
-            except:
-                config.logger.critical(f"While detecting path for symbol {cursor.displayname} at {makeSourceLocation(cursor, this.project)}")
-                raise        
+            path = this.__cursorPath(parent, cursor)
             
             # Try to parse node
             try: result = ClangParseContext.factories[kind](path, cursor, parent, this.module, this.project)
@@ -121,7 +130,73 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             return result
         else:
             config.logger.debug(f"Skipping symbol of unhandled kind {kind}")
+    
+    class LazyExternal:
+        def __init__(this, cursor, parent, sourceLoc):
+            this.cursor = cursor
+            this.parent = parent
+            this.sourceLoc = sourceLoc
+            this.expanded = False
+            this.astNode = None
+
+    def __ingestExternal(this, parent:cx_ast.ASTNode, cursor:Cursor) -> cx_ast.ASTNode|None:
+        path = this.__cursorPath(parent, cursor)
+        sourceLoc = makeSourceLocation(cursor, this.project)
+        if sourceLoc == None: return # Exclude system libs
+
+        if path not in this.module.externals.keys():
+            this.module.externals[path] = []
+            alreadyExists = False
+        else:
+            alreadyExists = any(i.sourceLoc == sourceLoc for i in this.module.externals[path])
             
+        if not alreadyExists:
+            # Lazy traversal - save for later in case it's needed
+            this.module.externals[path].append(ClangParseContext.LazyExternal(cursor, parent, sourceLoc))
+            
+    def __tryFindExternal(this, pathRequested:cx_ast.SymbolPath) -> list[cx_ast.ASTNode]:
+        if pathRequested in this.module.externals.keys():
+            matchingGroup = this.module.externals[pathRequested]
+            if all(i.expanded for i in matchingGroup):
+                # Trivial case: already expanded
+                return [i.astNode for i in this.module.externals[pathRequested]]
+        
+        # Requested a symbol that doesn't exist yet
+        def longestKnownPath():
+            p = pathRequested
+            while p != None and len(p) > 0:
+                if p in this.module.externals.keys(): return p
+                p = p.parent
+            return cx_ast.SymbolPath() # Top-level NS
+        longestKnownPath = longestKnownPath()
+            
+        # Check tail condition: all nodes already expanded, but given node was not found
+        if longestKnownPath in this.module.externals.keys() and all(i.expanded for i in this.module.externals[longestKnownPath]): return None
+
+        # Expand each candidate
+        for ext in this.module.externals[longestKnownPath]:
+            ext.expanded = True
+                
+            # Try to parse node
+            path = this.__cursorPath(ext.parent, ext.cursor)
+            kind = ext.cursor.kind
+            if kind in ClangParseContext.factories.keys():
+                try: ext.astNode = ClangParseContext.factories[kind](path, ext.cursor, ext.parent, this.module, this.project)
+                except:
+                    config.logger.critical(f"While ingesting external symbol {path}")
+                    raise
+
+            # Register children for lazy lookup as well
+            if ext.astNode != None:
+                for i in ext.cursor.get_children():
+                    this.__ingestExternal(ext.astNode, i)
+
+        # Recurse
+        return this.__tryFindExternal(pathRequested)
+                
+
+        
+    
 def ASTFactory(*cursorTypes:CursorKind):
     """
     Helper to auto-register factory functions
@@ -138,8 +213,11 @@ def ASTFactory(*cursorTypes:CursorKind):
 def makeSourceLocation(cursor:Cursor, project:Project):
     clang_loc:SourceLocation = cursor.location # Clang
     sourceFile = project.getFile(clang_loc.file.name)
-    assert sourceFile != None
-    return cx_ast.SourceLocation(sourceFile, clang_loc.line, clang_loc.column)
+    if sourceFile != None:
+        return cx_ast.SourceLocation(sourceFile, clang_loc.line, clang_loc.column)
+    else:
+        # System library - cannot directly reference
+        return None
 
 def makeVisibility(cursor:Cursor):
     return {

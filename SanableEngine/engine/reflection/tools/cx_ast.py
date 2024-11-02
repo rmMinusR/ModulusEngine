@@ -81,6 +81,9 @@ class SymbolPath:
         #if len(this.__parts) != len(rhs.__parts): return False
         #return all(this.__parts[i]==rhs.__parts[i] for i in range(len(this.__parts)))
     
+    def __len__(this):
+        return len(this.__parts)
+
     def startsWith(this, other:"SymbolPath"):
         if len(other.__parts) > len(this.__parts): return False
         return other.__parts == this.__parts[:len(other.__parts)]
@@ -186,6 +189,11 @@ class Module:
         this.__linked = False
         this.__linking = False
         this.__concurrentlyAdded = []
+
+        # Transient, only used during linking
+        # Dependency injection by reader implementation
+        this.externals:"dict[SymbolPath, Any]" = {}
+        this.findExternal:Callable[[SymbolPath], list[ASTNode]] = None
         
     def __getstate__(this):
         out = [i for i in this.contents.values() if isinstance(i, ASTNode) and not i.transient] \
@@ -311,10 +319,20 @@ class Module:
         
         this.__linking = False
         
-    def find(this, path:SymbolPath) -> ASTNode:
+    def find(this, path:SymbolPath) -> ASTNode|list[ASTNode]|None:
         assert this.__linked, "Can only be called after or during linking"
-        try: return this.contents[path]
-        except KeyError: return None
+        if path in this.contents.keys():
+            # We own this symbol and got it on our main pass
+            return this.contents[path]
+        else:
+            # Try externals
+            externals = this.findExternal(path)
+            if len(externals) != 0:
+                return externals if len(externals)>1 else externals[0]
+            else:
+                # Nope, not an external either
+                return None
+                
 
 
 class Namespace(ASTNode):
@@ -576,6 +594,8 @@ class ParentInfo(Member):
     def link(this, module: Module):
         super().link(module)
         this.parentType = module.find(this.parentTypePath)
+        if this.parentType == None:
+            config.logger.warn(f"Could not find {this.parentTypePath}, parent of {this.owner.path}")
 
     def latelink(this, module: Module):
         #if this.explicitlyVirtual:

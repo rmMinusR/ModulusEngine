@@ -49,19 +49,26 @@ class SourceFile:
 		
 	@cached_property
 	def includes(this):
-		return [
-			i for i in [
-				next(filter(lambda f: f.path==i, this.project.files), None)
-				for i in this.includes_literal
-			]
-			if i != None
-		]
+		out = []
+		for i in this.includes_literal:
+			abspath = os.path.abspath(i)
+
+			# Try to find existing from initial pass
+			sf = next(filter(lambda f: f.abspath==abspath, this.project.files), None)
+			
+			# Fallback: externals
+			if sf == None and os.path.exists(abspath):
+				# Omit system libraries, assume they don't change
+				sf = SourceFile(i, this.project)
+
+			if sf != None: out.append(sf)
+		return out
 
 	def __repr__(this):
 		return this.path
 
 	def __eq__(this, other):
-		return isinstance(other, SourceFile) and this.path == other.path
+		return isinstance(other, SourceFile) and this.abspath == other.abspath
 
 	def __hash__(this):
 		return hash(this.path)
@@ -115,6 +122,23 @@ class Project:
 		for p in this.srcRoots: this.files += glob.glob(p+"/**", recursive=True)
 		this.files = [SourceFile(i, this) for i in sorted(set(this.files)) if not os.path.isdir(i)]
 		this.files = [i for i in this.files if i.type != None] # Ignore non-C++ files
+		
+		# Only referenced includes, not everything in includeDirs
+		this.externalIncludes = None
+		externalIncludes = []
+		def _traverse(file:SourceFile):
+			for i in file.includes:
+				if i not in externalIncludes:
+					externalIncludes.append(i)
+					_traverse(i)
+		for i in this.files: _traverse(i)
+		externalIncludes = [i for i in externalIncludes if i not in this.files]
+		this.externalIncludes = externalIncludes
+
+		#externalIncludes = []
+		#for i in this.files: externalIncludes.extend(i.includes)
+		#externalIncludes = [i for i in externalIncludes if i not in this.files]
+		#this.externalIncludes = externalIncludes
 
 	def __getstate__(this):
 		return (this.files, this.srcRoots, this.includeDirs, this.additionalCompilerOptions)
@@ -142,8 +166,12 @@ class Project:
 		return None
 
 	def getFile(this, path:str) -> SourceFile|None:
+		abspath = os.path.abspath(path)
 		for i in this.files:
-			if i.path == path:
+			if i.abspath == abspath:
+				return i
+		for i in this.externalIncludes:
+			if i.abspath == abspath:
 				return i
 		return None
 
