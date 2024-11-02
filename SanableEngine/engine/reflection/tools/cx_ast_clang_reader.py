@@ -75,7 +75,7 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             elif cursor.semantic_parent.kind != CursorKind.TRANSLATION_UNIT:
                 # Namespaced globals/statics defined outside their
                 # container need to have their paths fixed
-                return _make_FullyQualifiedPath(cursor)
+                return _make_FullSymbolPath(cursor)
             else:
                 # Non-namespaced non-class-static global
                 return cx_ast.SymbolPath()+cursor.spelling
@@ -268,14 +268,14 @@ def factory_FieldInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNo
         path,
         makeSourceLocation(cursor, project),
         makeVisibility(cursor),
-        _make_FullyQualifiedPathPath(cursor.type)
+        _make_FullyQualifiedPath(cursor.type)
     )
 
 @ASTFactory(CursorKind.CXX_BASE_SPECIFIER)
 def factory_ParentInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
     return cx_ast.ParentInfo(
         ownPath.parent,
-        _make_FullyQualifiedPath(cursor),
+        _make_FullSymbolPath(cursor),
         makeSourceLocation(cursor, project),
         makeVisibility(cursor),
         any([i.spelling == "virtual" for i in cursor.get_tokens()])
@@ -285,7 +285,7 @@ def factory_ParentInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.A
 def factory_FriendInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
     return cx_ast.FriendInfo(
         ownPath.parent,
-        _make_FullyQualifiedPath( next(ClangParseContext._getChildren(cursor)) ),
+        _make_FullSymbolPath( next(ClangParseContext._getChildren(cursor)) ),
         makeSourceLocation(cursor, project),
         makeVisibility(cursor)
     )
@@ -330,7 +330,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
                 makeVisibility(cursor),
                 isExplicitVirtualMethod(cursor),
                 isExplicitOverride(cursor),
-                _make_FullyQualifiedPathPath(cursor.result_type),
+                _make_FullyQualifiedPath(cursor.result_type),
                 cursor.is_deleted_method(),
                 False, # TODO inline support
                 cursor.is_const_method(),
@@ -343,7 +343,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
                 makeSourceLocation(cursor, project),
                 cursor.is_definition(),
                 makeVisibility(cursor),
-                _make_FullyQualifiedPathPath(cursor.result_type),
+                _make_FullyQualifiedPath(cursor.result_type),
                 cursor.is_deleted_method(),
                 False # TODO inline support
             )
@@ -353,7 +353,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
             path,
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
-            _make_FullyQualifiedPathPath(cursor.result_type),
+            _make_FullyQualifiedPath(cursor.result_type),
             cursor.is_deleted_method(),
             False # TODO inline support
         )
@@ -365,7 +365,7 @@ def factory_ParameterInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_as
         ownPath,
         makeSourceLocation(cursor, project),
         len([i for i in parent.children if isinstance(i, cx_ast.Callable.Parameter)]),
-        _make_FullyQualifiedPathPath(cursor.type)
+        _make_FullyQualifiedPath(cursor.type)
     )
 
 @ASTFactory(CursorKind.VAR_DECL)
@@ -380,14 +380,14 @@ def factory_VarInfo_GlobalOrStatic(path:cx_ast.SymbolPath, cursor:Cursor, parent
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
             makeVisibility(cursor),
-            _make_FullyQualifiedPathPath(cursor.type)
+            _make_FullyQualifiedPath(cursor.type)
         )
     else:
         return cx_ast.GlobalVarInfo(
             path,
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
-            _make_FullyQualifiedPathPath(cursor.type)
+            _make_FullyQualifiedPath(cursor.type)
         )
 
 @ASTFactory(CursorKind.ANNOTATE_ATTR)
@@ -444,7 +444,7 @@ def _getTemplateParameter(target:Type, index:int) -> cx_ast.QualifiedPath|str:
         
     if paramKind == clang.cindex.TemplateArgumentKind.TYPE:
         paramType = cursor.get_template_argument_type(index)
-        return _make_FullyQualifiedPathPath(paramType)
+        return _make_FullyQualifiedPath(paramType)
     else:
         return str(cursor.get_template_argument_value(index))
 
@@ -457,7 +457,7 @@ def _getTemplateParameters(target:Type) -> list[cx_ast.QualifiedPath|str]:
     if "<" not in target.spelling or ">" not in target.spelling: return None # Template, but only via typedef
     return [_getTemplateParameter(target, i) for i in range(target.get_num_template_arguments())]
 
-def _make_FullyQualifiedPathPath(target:Type):
+def _make_FullyQualifiedPath(target:Type):
     qualifiers = []
     if target.is_const_qualified   (): qualifiers.append("const")
     if target.is_volatile_qualified(): qualifiers.append("volatile")
@@ -472,21 +472,30 @@ def _make_FullyQualifiedPathPath(target:Type):
         )
     elif target.kind == TypeKind.POINTER:
         return cx_ast.QualifiedPath(
-            base=_make_FullyQualifiedPathPath(target.get_pointee()),
+            base=_make_FullyQualifiedPath(target.get_pointee()),
             qualifiers=qualifiers,
             pointer_spec=cx_ast.QualifiedPath.Spec.POINTER
         )
     elif target.kind == TypeKind.MEMBERPOINTER:
-        raise Exception("Not implemented")
-        return cx_ast.QualifiedPath(
-            base=_make_FullyQualifiedPathPath(target.get_class_type()),
-            owner=None, # TODO implement!
-            qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedPath.Spec.MEM_FIELD_POINTER # TODO implement member field pointer vs member func pointer
-        )
+        pointee:Type = target.get_pointee()
+        if pointee.kind == TypeKind.FUNCTIONPROTO:
+            return cx_ast.QualifiedPath(
+                owner=_make_FullyQualifiedPath(target.get_class_type()),
+                func_args=[_make_FullyQualifiedPath(i) for i in pointee.argument_types()],
+                return_type=_make_FullyQualifiedPath(pointee.get_result()),
+                qualifiers=qualifiers,
+                pointer_spec=cx_ast.QualifiedPath.Spec.MEM_FUNC_POINTER
+            )
+        else:
+            return cx_ast.QualifiedPath(
+                base=_make_FullyQualifiedPath(pointee),
+                owner=_make_FullyQualifiedPath(target.get_class_type()),
+                qualifiers=qualifiers,
+                pointer_spec=cx_ast.QualifiedPath.Spec.MEM_FIELD_POINTER
+            )
     elif target.kind in [TypeKind.LVALUEREFERENCE, TypeKind.RVALUEREFERENCE]:
         return cx_ast.QualifiedPath(
-            base=_make_FullyQualifiedPathPath(target.get_pointee()),
+            base=_make_FullyQualifiedPath(target.get_pointee()),
             qualifiers=qualifiers,
             pointer_spec=cx_ast.QualifiedPath.Spec.REFERENCE # TODO move-reference support
         )
@@ -501,7 +510,7 @@ def _make_FullyQualifiedPathPath(target:Type):
         templateParams = _getTemplateParameters(target)
         # Plain old type, or template parameter
         return cx_ast.QualifiedPath(
-            _make_FullyQualifiedPath(target.get_declaration()),
+            _make_FullSymbolPath(target.get_declaration()),
             qualifiers=qualifiers,
             pointer_spec=cx_ast.QualifiedPath.Spec.NONE,
             template_params=templateParams if templateParams!=None else []
@@ -509,7 +518,7 @@ def _make_FullyQualifiedPathPath(target:Type):
     else:
         assert False, f"Unknown type kind: {target.kind} {target.spelling}"
 
-def _make_FullyQualifiedPath(cursor:Cursor):
+def _make_FullSymbolPath(cursor:Cursor):
     parts = []
     
     while type(cursor) != type(None) and cursor.kind != CursorKind.TRANSLATION_UNIT:
