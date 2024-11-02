@@ -319,8 +319,16 @@ class Module:
         
         this.__linking = False
         
-    def find(this, path:SymbolPath) -> ASTNode|list[ASTNode]|None:
+    def find(this, path:"SymbolPath|QualifiedPath") -> ASTNode|list[ASTNode]|None:
         assert this.__linked, "Can only be called after or during linking"
+
+        # Qualified type: wrap
+        if isinstance(path, QualifiedPath):
+            if path.pointer_spec == QualifiedPath.Spec.NONE:
+                return this.find(path.base)
+            else:
+                return QualifiedType(path, this)
+
         if path in this.contents.keys():
             # We own this symbol and got it on our main pass
             return this.contents[path]
@@ -359,7 +367,7 @@ class Annotation(ASTNode):
         return True
     
 
-class TypeInfo(ASTNode):
+class StructInfo(ASTNode):
     def __init__(this, path:SymbolPath, location: SourceLocation, isDefinition:bool, isAbstract:bool):
         ASTNode.__init__(this, path, location, isDefinition)
         this.isAbstract = isAbstract
@@ -412,9 +420,12 @@ class TypeInfo(ASTNode):
         ))
       
 
-class FundamentalType(TypeInfo):
+class FundamentalType(StructInfo):
     def __init__(this, name:str):
-        TypeInfo.__init__(this, SymbolPath()+name, None, True, False)
+        StructInfo.__init__(this, SymbolPath()+name, None, True, False)
+
+    @staticmethod
+    def allowMultiple(): return True
 
     @property
     def immediateParents(this): return []
@@ -492,11 +503,11 @@ class MaybeVirtual(Member):
 
 class Callable(ASTNode):
     class Parameter(ASTNode):
-        def __init__(this, path:SymbolPath, location:SourceLocation, index:int, typeName:"QualifiedType"):
+        def __init__(this, path:SymbolPath, location:SourceLocation, index:int, typeName:"QualifiedPath"):
             ASTNode.__init__(this, path.parent+SymbolPath.Anonymous(location, _type=f"parameter #{index}: {typeName} {path.ownName}"), location, False)
             this.index = index
             this.typeName = typeName
-            this.type:TypeInfo|None = None
+            this.type:StructInfo|None = None
 
         def latelink(this, module:Module):
             this.type = module.find(this.typeName)
@@ -580,7 +591,7 @@ class DestructorInfo(MaybeVirtual, Callable):
         Callable    .__init__(this, path, location, isDefinition, None, deleted, inline)
 
     def latelink(this, module: Module):
-        def __getAllDtors(ty:TypeInfo) -> list[DestructorInfo]:
+        def __getAllDtors(ty:StructInfo) -> list[DestructorInfo]:
             out = []
             for p in ty.children:
                 if isinstance(p, ParentInfo):
@@ -616,7 +627,7 @@ class StaticVarInfo(Member):
 
 
 class FieldInfo(Member):
-    def __init__(this, path:SymbolPath, location:SourceLocation, visibility:Member.Visibility, typeName:"QualifiedType"):
+    def __init__(this, path:SymbolPath, location:SourceLocation, visibility:Member.Visibility, typeName:"QualifiedPath"):
         Member.__init__(this, path, location, True, visibility)
         this.typeName = typeName
         this.type = None
@@ -654,10 +665,10 @@ class ParentInfo(Member):
         #if this.explicitlyVirtual:
         #    this.isVirtuallyInherited = True
         #else:
-        #    def __immediateParents(ty:TypeInfo): return (i for i in ty if isinstance(i, ParentInfo))
+        #    def __immediateParents(ty:StructInfo): return (i for i in ty if isinstance(i, ParentInfo))
         #    def __isVirtuallyInherited(p:ParentInfo):
         #        
-        #    def __isVirtual(ty:TypeInfo):
+        #    def __isVirtual(ty:StructInfo):
         #        return any(( i.explicitlyVirtual for i in __immediateParents(ty) )) or \
         #               any(( __isVirtual(i.parentType) for i in __immediateParents(ty) ))
         #    this.isVirtuallyInherited = __isVirtual(this)
@@ -684,24 +695,26 @@ class TemplateParameter(ASTNode):
 
 
 
-class QualifiedType:
-    class PointerSpec(str, Enum):
+class QualifiedPath: # SymbolPath-like
+    class Spec(str, Enum):
         NONE = "{base}{template_params} {qualifiers} {name}"
         POINTER = "{base}* {qualifiers} {name}"
         FUNC_POINTER = "{return_type} ({name}* {qualifiers})({func_args})"
         REFERENCE = "{base}{template_params}& {name} {qualifiers}"
         MOVE_REFERENCE = "{base}{template_params}&& {name} {qualifiers}"
-        MEM_FIELD_POINTER = "{base}::{name}* {qualifiers}"
-        MEM_FUNC_POINTER = "{return_type} ({base}::{name}* {qualifiers})({func_args}) {this_obj_qualifiers}"
+        MEM_FIELD_POINTER = "{base} {owner}::{name}* {qualifiers}"
+        MEM_FUNC_POINTER = "{return_type} ({owner}::{name}* {qualifiers})({func_args}) {this_obj_qualifiers}"
 
-    def __init__(this, base:"SymbolPath|QualifiedType|str", qualifiers:list[str]=[], pointer_spec:PointerSpec=PointerSpec.NONE,
-                       func_args:"list[QualifiedType]"=[], # All callables
-                       return_type:"QualifiedType"=None, # Functions
+    def __init__(this, base:"SymbolPath|QualifiedPath|str|None"=None, qualifiers:list[str]=[], pointer_spec:Spec=Spec.NONE,
+                       owner:SymbolPath|None=None,
+                       func_args:"list[QualifiedPath]"=[], # All callables
+                       return_type:"QualifiedPath"=None, # Functions
                        this_obj_qualifiers:list[str]=[], # Nonstatic member functions only
-                       template_params:"list[QualifiedType]"=[]): # Only valid if nonpointer
+                       template_params:"list[QualifiedPath]"=[]): # Only valid if nonpointer
         this.base = base
         this.qualifiers = qualifiers
         this.pointer_spec = pointer_spec
+        this.owner = owner
         this.return_type = return_type
         this.this_obj_qualifiers = this_obj_qualifiers
         this.func_args = func_args
@@ -709,13 +722,14 @@ class QualifiedType:
         
         this.qualifiers.sort()
         
-        if isinstance(base, QualifiedType):
-            assert base.pointer_spec not in [QualifiedType.PointerSpec.REFERENCE, QualifiedType.PointerSpec.MOVE_REFERENCE], "Pointer-to-reference is not valid syntax"
+        if isinstance(base, QualifiedPath):
+            assert base.pointer_spec not in [QualifiedPath.Spec.REFERENCE, QualifiedPath.Spec.MOVE_REFERENCE], "Pointer-to-reference is not valid syntax"
         
     def __get_formatter(this):
         return {
             "base": this.base,
             "qualifiers": "".join(" "+str(i) for i in this.qualifiers),
+            "owner": this.owner,
             "return_type": this.return_type if this.return_type != None else "",
             "func_args": ", ".join(str(i) for i in this.func_args),
             "this_obj_qualifiers": "".join(" "+str(i) for i in this.this_obj_qualifiers),
@@ -729,10 +743,10 @@ class QualifiedType:
     def __repr__(this): return this.__str__()
     
     def __eq__(this, other):
-        if not isinstance(other, QualifiedType): return False
+        if not isinstance(other, QualifiedPath): return False
         
         # If any form of func ptr, check args and return type
-        if this.pointer_spec in [QualifiedType.PointerSpec.FUNC_POINTER, QualifiedType.PointerSpec.MEM_FUNC_POINTER]:
+        if this.pointer_spec in [QualifiedPath.Spec.FUNC_POINTER, QualifiedPath.Spec.MEM_FUNC_POINTER]:
             if this.return_type != other.return_type or this.func_args != other.func_args: return False
 
         # Check basics
@@ -745,7 +759,7 @@ class QualifiedType:
         
         val = hash(this.base) ^ hash(this.pointer_spec)
         for i in this.qualifiers: val ^= hash(i)
-        if this.pointer_spec in [QualifiedType.PointerSpec.FUNC_POINTER, QualifiedType.PointerSpec.MEM_FUNC_POINTER]:
+        if this.pointer_spec in [QualifiedPath.Spec.FUNC_POINTER, QualifiedPath.Spec.MEM_FUNC_POINTER]:
             val ^= hash(this.return_type)
             val ^= hash(this.func_args)
         
@@ -756,3 +770,59 @@ class QualifiedType:
         formatter = this.__get_formatter()
         formatter["name"] = name
         return this.pointer_spec.format(**this.__get_formatter())
+
+
+class QualifiedType(StructInfo):
+    def __init__(this, qt:QualifiedPath, module:"Module"):
+        StructInfo.__init__(this, None, None, True, False)
+        this.qualifiers = qt.qualifiers
+        this.spec = qt.pointer_spec
+        
+        this.base = None
+        this.funcReturns = None
+        this.funcArgs = None
+        this.memberOwner = None
+
+        if qt.pointer_spec == QualifiedPath.Spec.NONE:
+            # NOT Foo
+            raise Exception("Illegal: unqualified type passed")
+        elif qt.pointer_spec in [QualifiedPath.Spec.POINTER, QualifiedPath.Spec.REFERENCE, QualifiedPath.Spec.MOVE_REFERENCE]:
+            # Foo&, Foo*, Foo**
+            this.base = module.find(qt.base)
+        elif qt.pointer_spec == QualifiedPath.Spec.FUNC_POINTER:
+            # int(*)(void)
+            this.funcReturns = module.find(qt.return_type)
+            this.funcArgs = [module.find(i) for i in qt.func_args]
+        elif qt.pointer_spec == QualifiedPath.Spec.MEM_FUNC_POINTER:
+            # int(Foo::*)(void)
+            this.memberOwner = module.find(qt.owner)
+            this.funcReturns = module.find(qt.return_type)
+            this.funcArgs = [module.find(i) for i in qt.func_args]
+        elif qt.pointer_spec == QualifiedPath.Spec.MEM_FIELD_POINTER:
+            # int Foo::*
+            this.memberOwner = module.find(qt.owner)
+            this.base = module.find(qt.base)
+        else:
+            raise Exception("Not implemented")
+        
+        # const, volatile, restrict
+        this.qualifiers = qt.qualifiers
+        
+    def __str__(this):
+        typeStr = str(type(this))
+        typeStr = typeStr[len("<class '"):-len("'>")].split(".")[-1]
+        return f"{this.qualifiers} ({typeStr})"
+    
+    @staticmethod
+    def allowMultiple(): return True
+    
+    @property
+    def immediateParents(this): return []
+    def find(this, memberName, searchParents=False): return None
+    def findInParents(this, memberName): return None
+    def isFriended(this, selector): return False
+    
+    def merge(this, new:ASTNode): pass
+    def link(this, module:"Module"): pass
+    def latelink(this, module:"Module"): pass
+

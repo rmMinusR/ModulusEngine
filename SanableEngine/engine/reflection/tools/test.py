@@ -95,15 +95,15 @@ def CallParams(base:str, args:list[cx_ast.SymbolPath], affixes=None) -> cx_ast.S
     return cx_ast.SymbolPath.CallParameterized(base, args, affixes if affixes!=None else [])
 
 
-ty_int = cx_ast.QualifiedType("int")
-ty_char = cx_ast.QualifiedType("char")
-ty_void = cx_ast.QualifiedType("void")
-ty_const_void = cx_ast.QualifiedType("void", qualifiers=["const"])
-def ty_ptr(ty:cx_ast.QualifiedType): return cx_ast.QualifiedType(ty, pointer_spec=cx_ast.QualifiedType.PointerSpec.POINTER)
-def ty_ref(ty:cx_ast.QualifiedType): return cx_ast.QualifiedType(ty, pointer_spec=cx_ast.QualifiedType.PointerSpec.REFERENCE)
+ty_int = cx_ast.QualifiedPath("int")
+ty_char = cx_ast.QualifiedPath("char")
+ty_void = cx_ast.QualifiedPath("void")
+ty_const_void = cx_ast.QualifiedPath("void", qualifiers=["const"])
+def ty_ptr(ty:cx_ast.QualifiedPath): return cx_ast.QualifiedPath(ty, pointer_spec=cx_ast.QualifiedPath.Spec.POINTER)
+def ty_ref(ty:cx_ast.QualifiedPath): return cx_ast.QualifiedPath(ty, pointer_spec=cx_ast.QualifiedPath.Spec.REFERENCE)
 ty_const_void_ptr = ty_ptr(ty_const_void)
-ty_MyClass = cx_ast.QualifiedType(cx_ast.SymbolPath()+"MyClass")
-ty_MyClass_const = cx_ast.QualifiedType(cx_ast.SymbolPath()+"MyClass", qualifiers=["const"])
+ty_MyClass = cx_ast.QualifiedPath(cx_ast.SymbolPath()+"MyClass")
+ty_MyClass_const = cx_ast.QualifiedPath(cx_ast.SymbolPath()+"MyClass", qualifiers=["const"])
 ty_MyClass_ptr = ty_ptr(ty_MyClass)
 ty_MyClass_const_ref = ty_ref(ty_MyClass_const)
 
@@ -154,7 +154,7 @@ class TestParser:
         this.assertEqual(len(sym.declarationLocations), 1, msg="Symbol should be declared separate from definition")
         this.assertNotEqual(sym.declarationLocations[0], sym.definitionLocation, msg="Symbol should be declared separate from definition")
         
-        this.assertExpectSymbol(["MyClass"], cx_ast.TypeInfo)
+        this.assertExpectSymbol(["MyClass"], cx_ast.StructInfo)
         this.assertExpectSymbol(["MyClass", CallParams("MyClass", [])], cx_ast.ConstructorInfo)
         this.assertExpectSymbol(["MyClass", CallParams("~MyClass", [])], cx_ast.DestructorInfo)
         this.assertExpectSymbol(["MyClass", CallParams("MyClass", [ty_MyClass_const_ref])], cx_ast.ConstructorInfo)
@@ -169,13 +169,13 @@ class TestParser:
         this.assertExpectSymbol(["MyClass", CallParams("myConstClassFunc", [ty_int], ["const"])], cx_ast.MemFuncInfo) # TODO test disambiguation with this-const overloading
         this.assertExpectSymbol(["MyClass", CallParams("myStaticClassFunc", [ty_int, ty_MyClass_ptr])], cx_ast.StaticFuncInfo)
         
-        mySubclass = this.assertExpectSymbol(["MySubclass"], cx_ast.TypeInfo)
+        mySubclass = this.assertExpectSymbol(["MySubclass"], cx_ast.StructInfo)
         parents = [i for i in mySubclass.children if isinstance(i, cx_ast.ParentInfo)]
         this.assertTrue(len(parents) == 1)
         this.assertTrue(parents[0].parentTypePath == cx_ast.SymbolPath()+"MyClass")
         
     def test_implicit_symbols_exist(this):
-        this.assertExpectSymbol(["NonDefaulted"], cx_ast.TypeInfo)
+        this.assertExpectSymbol(["NonDefaulted"], cx_ast.StructInfo)
         this.assertExpectSymbol(["NonDefaulted", CallParams("NonDefaulted", [])], None) # Explicit ctor defined, removes implicit default ctor
         this.assertExpectSymbol(["NonDefaulted", CallParams("NonDefaulted", [ty_int])], cx_ast.ConstructorInfo)
         this.assertExpectSymbol(["NonDefaulted", CallParams("~NonDefaulted", [])], cx_ast.DestructorInfo) # Implicit dtor
@@ -200,10 +200,10 @@ class TestParser:
         this.assertTrue(func.isVirtual)
         
     def test_virtual_inheritance_detection(this):
-        base      :cx_ast.TypeInfo = this.assertExpectSymbol(["DiamondSharedBase"], cx_ast.TypeInfo)
-        a         :cx_ast.TypeInfo = this.assertExpectSymbol(["DiamondA"], cx_ast.TypeInfo)
-        b         :cx_ast.TypeInfo = this.assertExpectSymbol(["DiamondB"], cx_ast.TypeInfo)
-        grandchild:cx_ast.TypeInfo = this.assertExpectSymbol(["DiamondGrandchild"], cx_ast.TypeInfo)
+        base      :cx_ast.StructInfo = this.assertExpectSymbol(["DiamondSharedBase"], cx_ast.StructInfo)
+        a         :cx_ast.StructInfo = this.assertExpectSymbol(["DiamondA"], cx_ast.StructInfo)
+        b         :cx_ast.StructInfo = this.assertExpectSymbol(["DiamondB"], cx_ast.StructInfo)
+        grandchild:cx_ast.StructInfo = this.assertExpectSymbol(["DiamondGrandchild"], cx_ast.StructInfo)
         
         base_in_a = next((i for i in a.immediateParents if i.parentType==base))
         base_in_b = next((i for i in b.immediateParents if i.parentType==base))
@@ -246,7 +246,7 @@ class TestParser:
         sym = this.assertExpectSymbol(["MyNamespace", "globalVarInNSExterned"], cx_ast.GlobalVarInfo)
         this.assertIsNone(sym.definitionLocation, msg="Symbol should not be defined")
         
-        this.assertExpectSymbol(["MyNamespace", "ClassInNamespace"], cx_ast.TypeInfo)
+        this.assertExpectSymbol(["MyNamespace", "ClassInNamespace"], cx_ast.StructInfo)
         this.assertExpectSymbol(["MyNamespace", "ClassInNamespace", CallParams("ClassInNamespace", [])], cx_ast.ConstructorInfo) # Implicit default ctor
         this.assertExpectSymbol(["MyNamespace", "ClassInNamespace", CallParams("~ClassInNamespace", [])], cx_ast.DestructorInfo) # Implicit default dtor
         
@@ -255,7 +255,7 @@ class TestParser:
         this.assertExpectAnnotation(annotTgt, lambda a: a.text == "annot_globfunc", 1)
         annotTgt = this.assertExpectSymbol(["annotatedGlobalVar"], cx_ast.GlobalVarInfo)
         this.assertExpectAnnotation(annotTgt, lambda a: a.text == "annot_globvar", 1)
-        annotTgt = this.assertExpectSymbol(["AnnotatedClass"], cx_ast.TypeInfo)
+        annotTgt = this.assertExpectSymbol(["AnnotatedClass"], cx_ast.StructInfo)
         this.assertExpectAnnotation(annotTgt, lambda a: a.text == "annot_cls", 1)
         annotTgt = this.assertExpectSymbol(["AnnotatedClass", "foo"], cx_ast.FieldInfo)
         this.assertExpectAnnotation(annotTgt, lambda a: a.text == "annot_field", 1)
@@ -267,42 +267,42 @@ class TestParser:
         this.assertExpectAnnotation(annotTgt, lambda a: a.text == "annot_ns_b", 2)
         
     def test_templated_types_exist(this):
-        tgt = this.assertExpectSymbol(["TemplatedType_Typename"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_Typename"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "typename" and tgt.paramName == "T" and tgt.defaultValue == None)
 
-        tgt = this.assertExpectSymbol(["TemplatedType_Class"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_Class"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "class" and tgt.paramName == "T" and tgt.defaultValue == None)
         
-        tgt = this.assertExpectSymbol(["TemplatedType_Int"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_Int"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "int" and tgt.paramName == "val" and tgt.defaultValue == None)
 
-        tgt = this.assertExpectSymbol(["TemplatedType_VoidPtr"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_VoidPtr"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "void*" and tgt.paramName == "val" and tgt.defaultValue == None)
 
-        tgt = this.assertExpectSymbol(["TemplatedType_DefaultType"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_DefaultType"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "typename" and tgt.paramName == "T" and tgt.defaultValue == "int")
 
-        tgt = this.assertExpectSymbol(["TemplatedType_DefaultInt"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_DefaultInt"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "int" and tgt.paramName == "val" and tgt.defaultValue == "3")
         
-        tgt = this.assertExpectSymbol(["TemplatedType_NamelessParam"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_NamelessParam"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "typename" and tgt.paramName == "" and tgt.defaultValue == None)
         
-        tgt = this.assertExpectSymbol(["TemplatedType_NamelessDefaultedParam"], cx_ast.TypeInfo)
+        tgt = this.assertExpectSymbol(["TemplatedType_NamelessDefaultedParam"], cx_ast.StructInfo)
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "typename" and tgt.paramName == "" and tgt.defaultValue == "int")

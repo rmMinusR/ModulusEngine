@@ -92,7 +92,7 @@ class RttiGenerator(cx_ast_tooling.ASTConsumer):
     def __renderIncludes(this):
         includes:list[source_discovery.SourceFile] = list()
         for ty in this.stableSymbols:
-            if isinstance(ty, cx_ast.TypeInfo) and ty.definitionLocation != None:
+            if isinstance(ty, cx_ast.StructInfo) and ty.definitionLocation != None:
                 includes.append(ty.definitionLocation.file)
             elif isinstance(ty, cx_ast.GlobalFuncInfo):
                 includes.extend([i.file for i in ty.declarationLocations])  
@@ -140,7 +140,7 @@ def MemRttiRenderer(*types:typing.Type):
 
 ########################## AST node renderers ##########################
 
-def _getAllParents(ty:cx_ast.TypeInfo):
+def _getAllParents(ty:cx_ast.StructInfo):
     out:list[cx_ast.ParentInfo] = []
     
     # Accumulate
@@ -155,8 +155,8 @@ def _getAllParents(ty:cx_ast.TypeInfo):
     
     return out
 
-@RttiRenderer(cx_ast.TypeInfo)
-def render_type(ty:cx_ast.TypeInfo):
+@RttiRenderer(cx_ast.StructInfo)
+def render_type(ty:cx_ast.StructInfo):
     # Don't write template types (for now)
     if ty.path.isDynamicallyInstanced: return None
 
@@ -334,7 +334,7 @@ def searchAnnotations(node:cx_ast.ASTNode, selector, includeParents=True) -> cx_
 
 ########################## Annotation: CDO enable/backend ##########################
 
-def detectImageCaptureStatus(ty:cx_ast.TypeInfo):
+def detectImageCaptureStatus(ty:cx_ast.StructInfo):
     prefix = "stix::do_image_capture"
     annot = searchAnnotations(ty, lambda a: a.text.startswith(prefix))
     if annot != None:
@@ -344,7 +344,7 @@ def detectImageCaptureStatus(ty:cx_ast.TypeInfo):
         status = RttiGenerator.defaultImageCaptureStatus
     return evalAsBool(status)
 
-def detectImageCaptureBackend(ty:cx_ast.TypeInfo):
+def detectImageCaptureBackend(ty:cx_ast.StructInfo):
     prefix = "stix::image_capture_backend"
     annot = searchAnnotations(ty, lambda a: a.text.startswith(prefix))
     if annot != None:
@@ -354,7 +354,7 @@ def detectImageCaptureBackend(ty:cx_ast.TypeInfo):
         backend = RttiGenerator.defaultImageCaptureBackend
     return backend
 
-imageCaptureBackend_t = typing.Callable[[cx_ast.TypeInfo], str]
+imageCaptureBackend_t = typing.Callable[[cx_ast.StructInfo], str]
 imageCaptureBackends:dict[str, imageCaptureBackend_t] = dict()
 def ImageCaptureBackend(name:str):
     """
@@ -367,7 +367,7 @@ def ImageCaptureBackend(name:str):
     return registrar
 
 @ImageCaptureBackend("cdo")
-def __renderImageCapture_cdo(ty:cx_ast.TypeInfo):
+def __renderImageCapture_cdo(ty:cx_ast.StructInfo):
     # Gather valid constructors
     ctors = [i for i in ty.children if isinstance(i, cx_ast.ConstructorInfo) and not i.deleted]
     isGeneratorFnFriended = ty.isFriended(lambda i: i.friendedSymbolPath.startsWith(cx_ast.SymbolPath()+"thunk_utils"))
@@ -381,7 +381,7 @@ def __renderImageCapture_cdo(ty:cx_ast.TypeInfo):
     return f"builder.captureClassImage_v1<{ty.path}>();"
 
 @ImageCaptureBackend("disassembly")
-def __renderImageCapture_disassembly(ty:cx_ast.TypeInfo):
+def __renderImageCapture_disassembly(ty:cx_ast.StructInfo):
     # Gather valid constructors
     ctors = [i for i in ty.children if isinstance(i, cx_ast.ConstructorInfo) and not i.deleted]
     isGeneratorFnFriended = ty.isFriended(lambda i: i.friendedSymbolPath.startsWith(cx_ast.SymbolPath()+"thunk_utils"))

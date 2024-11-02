@@ -251,8 +251,8 @@ def factory_Namespace(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNo
 	CursorKind.STRUCT_DECL, CursorKind.UNION_DECL,
     CursorKind.CLASS_TEMPLATE
 )
-def factory_TypeInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
-    return cx_ast.TypeInfo(
+def factory_StructInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
+    return cx_ast.StructInfo(
         path,
         makeSourceLocation(cursor, project),
         cursor.is_definition(),
@@ -265,7 +265,7 @@ def factory_FieldInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNo
         path,
         makeSourceLocation(cursor, project),
         makeVisibility(cursor),
-        _make_FullyQualifiedTypePath(cursor.type)
+        _make_FullyQualifiedPathPath(cursor.type)
     )
 
 @ASTFactory(CursorKind.CXX_BASE_SPECIFIER)
@@ -314,8 +314,8 @@ def factory_DestructorInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.
 @ASTFactory(CursorKind.CXX_METHOD, CursorKind.FUNCTION_DECL, CursorKind.FUNCTION_TEMPLATE)
 def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
     # Deduce parent, whether inline or out-of-line
-    parentIsType = isinstance(parent, cx_ast.TypeInfo)
-    if not parentIsType: parentIsType = path.parent in module.contents.keys() and isinstance(module.contents[path.parent], cx_ast.TypeInfo)
+    parentIsType = isinstance(parent, cx_ast.StructInfo)
+    if not parentIsType: parentIsType = path.parent in module.contents.keys() and isinstance(module.contents[path.parent], cx_ast.StructInfo)
     
     if parentIsType:
         if not cursor.is_static_method():
@@ -327,7 +327,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
                 makeVisibility(cursor),
                 isExplicitVirtualMethod(cursor),
                 isExplicitOverride(cursor),
-                _make_FullyQualifiedTypePath(cursor.result_type),
+                _make_FullyQualifiedPathPath(cursor.result_type),
                 cursor.is_deleted_method(),
                 False, # TODO inline support
                 cursor.is_const_method(),
@@ -340,7 +340,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
                 makeSourceLocation(cursor, project),
                 cursor.is_definition(),
                 makeVisibility(cursor),
-                _make_FullyQualifiedTypePath(cursor.result_type),
+                _make_FullyQualifiedPathPath(cursor.result_type),
                 cursor.is_deleted_method(),
                 False # TODO inline support
             )
@@ -350,7 +350,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
             path,
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
-            _make_FullyQualifiedTypePath(cursor.result_type),
+            _make_FullyQualifiedPathPath(cursor.result_type),
             cursor.is_deleted_method(),
             False # TODO inline support
         )
@@ -362,14 +362,14 @@ def factory_ParameterInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_as
         ownPath,
         makeSourceLocation(cursor, project),
         len([i for i in parent.children if isinstance(i, cx_ast.Callable.Parameter)]),
-        _make_FullyQualifiedTypePath(cursor.type)
+        _make_FullyQualifiedPathPath(cursor.type)
     )
 
 @ASTFactory(CursorKind.VAR_DECL)
 def factory_VarInfo_GlobalOrStatic(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
     # Deduce parent, whether inline or out-of-line
-    parentIsType = isinstance(parent, cx_ast.TypeInfo)
-    if not parentIsType: parentIsType = path.parent in module.contents.keys() and isinstance(module.contents[path.parent], cx_ast.TypeInfo)
+    parentIsType = isinstance(parent, cx_ast.StructInfo)
+    if not parentIsType: parentIsType = path.parent in module.contents.keys() and isinstance(module.contents[path.parent], cx_ast.StructInfo)
 
     if parentIsType:
         return cx_ast.StaticVarInfo(
@@ -377,14 +377,14 @@ def factory_VarInfo_GlobalOrStatic(path:cx_ast.SymbolPath, cursor:Cursor, parent
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
             makeVisibility(cursor),
-            _make_FullyQualifiedTypePath(cursor.type)
+            _make_FullyQualifiedPathPath(cursor.type)
         )
     else:
         return cx_ast.GlobalVarInfo(
             path,
             makeSourceLocation(cursor, project),
             cursor.is_definition(),
-            _make_FullyQualifiedTypePath(cursor.type)
+            _make_FullyQualifiedPathPath(cursor.type)
         )
 
 @ASTFactory(CursorKind.ANNOTATE_ATTR)
@@ -427,7 +427,7 @@ def _dropLeading(val:str, to_drop:list[str]):
             return _dropLeading(val[len(i):].strip(), to_drop)
     return val
 
-def _getTemplateParameter(target:Type, index:int) -> cx_ast.QualifiedType|str:
+def _getTemplateParameter(target:Type, index:int) -> cx_ast.QualifiedPath|str:
     assert target.get_num_template_arguments() != 0, f"Symbol {target.spelling} is not a template"
     cursor:Cursor = target.get_declaration()
     
@@ -441,7 +441,7 @@ def _getTemplateParameter(target:Type, index:int) -> cx_ast.QualifiedType|str:
         
     if paramKind == clang.cindex.TemplateArgumentKind.TYPE:
         paramType = cursor.get_template_argument_type(index)
-        return _make_FullyQualifiedTypePath(paramType)
+        return _make_FullyQualifiedPathPath(paramType)
     else:
         return str(cursor.get_template_argument_value(index))
 
@@ -449,12 +449,12 @@ def _getTemplateParameter(target:Type, index:int) -> cx_ast.QualifiedType|str:
     #prev_kinds = [cursor.get_template_argument_kind(i) for i in range(index)]
     #typed_index = 
 
-def _getTemplateParameters(target:Type) -> list[cx_ast.QualifiedType|str]:
+def _getTemplateParameters(target:Type) -> list[cx_ast.QualifiedPath|str]:
     if target.get_num_template_arguments() == -1: return None # Idiom for non-template
     if "<" not in target.spelling or ">" not in target.spelling: return None # Template, but only via typedef
     return [_getTemplateParameter(target, i) for i in range(target.get_num_template_arguments())]
 
-def _make_FullyQualifiedTypePath(target:Type):
+def _make_FullyQualifiedPathPath(target:Type):
     qualifiers = []
     if target.is_const_qualified   (): qualifiers.append("const")
     if target.is_volatile_qualified(): qualifiers.append("volatile")
@@ -462,43 +462,45 @@ def _make_FullyQualifiedTypePath(target:Type):
     
     if target.spelling in ["auto", "decltype(auto)"]:
         # Special case: Can't deduce auto, decltype(auto)
-        return cx_ast.QualifiedType(
-            _dropLeading(target.spelling, qualifiers),
+        return cx_ast.QualifiedPath(
+            base=_dropLeading(target.spelling, qualifiers),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.NONE
+            pointer_spec=cx_ast.QualifiedPath.Spec.NONE
         )
     elif target.kind == TypeKind.POINTER:
-        return cx_ast.QualifiedType(
-            _make_FullyQualifiedTypePath(target.get_pointee()),
+        return cx_ast.QualifiedPath(
+            base=_make_FullyQualifiedPathPath(target.get_pointee()),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.POINTER
+            pointer_spec=cx_ast.QualifiedPath.Spec.POINTER
         )
     elif target.kind == TypeKind.MEMBERPOINTER:
-        return cx_ast.QualifiedType(
-            _make_FullyQualifiedTypePath(target.get_class_type()),
+        raise Exception("Not implemented")
+        return cx_ast.QualifiedPath(
+            base=_make_FullyQualifiedPathPath(target.get_class_type()),
+            owner=None, # TODO implement!
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.MEM_FIELD_POINTER # TODO implement member field pointer vs member func pointer
+            pointer_spec=cx_ast.QualifiedPath.Spec.MEM_FIELD_POINTER # TODO implement member field pointer vs member func pointer
         )
     elif target.kind in [TypeKind.LVALUEREFERENCE, TypeKind.RVALUEREFERENCE]:
-        return cx_ast.QualifiedType(
-            _make_FullyQualifiedTypePath(target.get_pointee()),
+        return cx_ast.QualifiedPath(
+            base=_make_FullyQualifiedPathPath(target.get_pointee()),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.REFERENCE # TODO move-reference support
+            pointer_spec=cx_ast.QualifiedPath.Spec.REFERENCE # TODO move-reference support
         )
     elif target.get_declaration().kind == CursorKind.NO_DECL_FOUND:
         # Template parameter or fundamental literal type
-        return cx_ast.QualifiedType(
-            _dropLeading(target.spelling, qualifiers),
+        return cx_ast.QualifiedPath(
+            base=_dropLeading(target.spelling, qualifiers),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.NONE
+            pointer_spec=cx_ast.QualifiedPath.Spec.NONE
         )
     elif target.kind in [TypeKind.ELABORATED, TypeKind.RECORD]:
         templateParams = _getTemplateParameters(target)
         # Plain old type, or template parameter
-        return cx_ast.QualifiedType(
+        return cx_ast.QualifiedPath(
             _make_FullyQualifiedPath(target.get_declaration()),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedType.PointerSpec.NONE,
+            pointer_spec=cx_ast.QualifiedPath.Spec.NONE,
             template_params=templateParams if templateParams!=None else []
         )
     else:
