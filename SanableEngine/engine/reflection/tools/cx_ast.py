@@ -328,6 +328,8 @@ class Module:
     def find(this, path:"SymbolPath|QualifiedPath") -> ASTNode|list[ASTNode]|None:
         assert this.__linked, "Can only be called after or during linking"
 
+        if isinstance(path, str): path = SymbolPath()+path
+
         # Qualified type: wrap
         if isinstance(path, QualifiedPath):
             if path.pointer_spec == QualifiedPath.Spec.NONE:

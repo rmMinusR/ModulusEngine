@@ -168,6 +168,7 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             p = pathRequested
             while p != None and len(p) > 0:
                 if p in this.module.externals.keys(): return p
+                if isinstance(p, str): return cx_ast.SymbolPath()+p
                 p = p.parent
             return None # Top-level NS
         longestKnownPath = longestKnownPath()

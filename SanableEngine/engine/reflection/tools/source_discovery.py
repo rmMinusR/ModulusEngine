@@ -74,10 +74,10 @@ class SourceFile:
 		return hash(this.path)
 
 	def __getstate__(this):
-		return (this.path, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal)
+		return (this.path, this.abspath, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal)
 
 	def __setstate__(this, d):
-		(this.path, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal) = d
+		(this.path, this.abspath, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal) = d
 		this.tu = None
 		this.project = None # Must be rebound elsewhere!
 
