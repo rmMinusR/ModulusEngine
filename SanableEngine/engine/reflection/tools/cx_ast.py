@@ -325,9 +325,14 @@ class Module:
             # We own this symbol and got it on our main pass
             return this.contents[path]
         else:
+            # Try fundamental types
+            match = next((i for i in all_fundamental_types if i.path==path), None)
+            if match != None:
+                return match
+
             # Try externals
             externals = this.findExternal(path)
-            if len(externals) != 0:
+            if externals != None and len(externals) != 0:
                 return externals if len(externals)>1 else externals[0]
             else:
                 # Nope, not an external either
@@ -405,9 +410,52 @@ class TypeInfo(ASTNode):
             isinstance(i, FriendInfo) and selector(i)
             for i in this.children
         ))
-        
-     
-        
+      
+
+class FundamentalType(TypeInfo):
+    def __init__(this, name:str):
+        TypeInfo.__init__(this, SymbolPath()+name, None, True, False)
+
+    @property
+    def immediateParents(this): return []
+    def find(this, memberName, searchParents=False): return None
+    def findInParents(this, memberName): return None
+    def isFriended(this, selector): return False
+    
+    def merge(this, new:ASTNode): pass
+    def link(this, module:"Module"): pass
+    def latelink(this, module:"Module"): pass
+    
+def fundamental_type_variations(base, do_int:bool=True) -> list[FundamentalType]:
+    out = [
+        FundamentalType(base),
+        FundamentalType("signed "+base),
+        FundamentalType("unsigned "+base)
+    ]
+    if do_int: out += fundamental_type_variations(base+" int", do_int=False)
+    return out
+
+all_fundamental_types = [
+    # Others
+    FundamentalType("wchar_t"),
+    FundamentalType("void"),
+    FundamentalType("bool"),
+    
+    # Floating point
+    FundamentalType("float"),
+    FundamentalType("double"),
+    FundamentalType("long double"),
+]
+
+# Integral types
+all_fundamental_types += fundamental_type_variations("char", do_int=False) \
+                       + fundamental_type_variations("short") \
+                       + fundamental_type_variations("int", do_int=False) \
+                       + fundamental_type_variations("long") \
+                       + fundamental_type_variations("long long")
+
+
+
 class Member(ASTNode):
     
     class Visibility(str, Enum):
@@ -568,14 +616,19 @@ class StaticVarInfo(Member):
 
 
 class FieldInfo(Member):
-    def __init__(this, path:SymbolPath, location:SourceLocation, visibility:Member.Visibility, typeName:str|None):
+    def __init__(this, path:SymbolPath, location:SourceLocation, visibility:Member.Visibility, typeName:"QualifiedType"):
         Member.__init__(this, path, location, True, visibility)
         this.typeName = typeName
         this.type = None
         
     def link(this, module:Module):
         super().link(module)
-        this.type = module.find(this.typeName)
+        if isinstance(this.typeName.base, SymbolPath):
+            this.type = module.find(this.typeName.base)
+        elif isinstance(this.typeName.base, str):
+            this.type = module.find(SymbolPath()+this.typeName.base)
+        else:
+            this.type = None # FIXME pointer-to-pointer
         
 
 class ParentInfo(Member):
@@ -595,7 +648,7 @@ class ParentInfo(Member):
         super().link(module)
         this.parentType = module.find(this.parentTypePath)
         if this.parentType == None:
-            config.logger.warn(f"Could not find {this.parentTypePath}, parent of {this.owner.path}")
+            config.logger.warning(f"Could not find {this.parentTypePath}, parent of {this.owner.path}")
 
     def latelink(this, module: Module):
         #if this.explicitlyVirtual:

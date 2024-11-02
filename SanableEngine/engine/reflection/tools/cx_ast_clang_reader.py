@@ -167,11 +167,16 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             while p != None and len(p) > 0:
                 if p in this.module.externals.keys(): return p
                 p = p.parent
-            return cx_ast.SymbolPath() # Top-level NS
+            return None # Top-level NS
         longestKnownPath = longestKnownPath()
             
         # Check tail condition: all nodes already expanded, but given node was not found
         if longestKnownPath in this.module.externals.keys() and all(i.expanded for i in this.module.externals[longestKnownPath]): return None
+
+        # Check panic condition: can't locate (probably in system libs)
+        if longestKnownPath not in this.module.externals.keys():
+            config.logger.warning(f"Could not locate external(?) symbol: {pathRequested}")
+            return None
 
         # Expand each candidate
         for ext in this.module.externals[longestKnownPath]:
