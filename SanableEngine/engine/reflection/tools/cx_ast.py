@@ -14,6 +14,12 @@ class SourceLocation:
     def __repr__(this):
         return f"{this.file.name} : L{this.line}.C{this.column}"
 
+    def __eq__(this, rhs:"SourceLocation"):
+        if not isinstance(rhs, SourceLocation): return False
+        return this.file == rhs.file \
+           and this.column == rhs.column \
+           and this.line == rhs.line
+
 
 class SymbolPath:
     BasicSegment = str
@@ -339,7 +345,7 @@ class Module:
                 return match
 
             # Try externals
-            externals = this.findExternal(path)
+            externals:None|list[ASTNode] = this.findExternal(path)
             if externals != None and len(externals) != 0:
                 return externals if len(externals)>1 else externals[0]
             else:

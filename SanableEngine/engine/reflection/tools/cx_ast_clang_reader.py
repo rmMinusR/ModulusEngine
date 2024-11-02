@@ -159,7 +159,9 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             matchingGroup = this.module.externals[pathRequested]
             if all(i.expanded for i in matchingGroup):
                 # Trivial case: already expanded
-                return [i.astNode for i in this.module.externals[pathRequested]]
+                declarations = [i.astNode for i in matchingGroup]
+                definition = next((i for i in declarations if i != None and i.definitionLocation != None), None)
+                return [definition] if definition!=None else declarations
         
         # Requested a symbol that doesn't exist yet
         def longestKnownPath():
