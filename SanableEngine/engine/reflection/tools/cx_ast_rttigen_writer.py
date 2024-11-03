@@ -259,7 +259,13 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
 def render_memFunc(func:cx_ast.MemFuncInfo):
     # Don't write template callables
     if _isTemplate(func): return None
-
+    
+    if func.deleted:
+        return (
+            f"//Cannot capture deleted function {func.path}",
+            f"//Cannot capture deleted function {func.path}"
+        )
+    
     # Detect how to reference
     #if func.visibility != cx_ast.Member.Visibility.Public:
     pubCastKey = makePubCastKey(func)
@@ -280,13 +286,10 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
     #else:
     #    preDecl = f"//{func.path} is already public: no need for public_cast"
     #    pubReference = func.path
-    
-    if not func.deleted:
-        paramNames = [i.path.ownName for i in func.parameters] # TODO implement name capture on C++ side
-        body = f"builder.addMemberFunction(stix::MemberFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility}, {str(func.isVirtual).lower()});"
-    else:
-        body = f"//Cannot capture deleted function {func.path}"
-        # TODO handle template funcs
+        
+    # Render body
+    paramNames = [i.path.ownName for i in func.parameters] # TODO implement name capture on C++ side
+    body = f"builder.addMemberFunction(stix::MemberFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility}, {str(func.isVirtual).lower()});"
 
     return (preDecl, body)
 
@@ -294,7 +297,13 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
 def render_memStaticFunc(func:cx_ast.StaticFuncInfo):
     # Don't write template callables
     if _isTemplate(func): return None
-
+    
+    if func.deleted:
+        return (
+            f"//Cannot capture deleted function {func.path}",
+            f"//Cannot capture deleted function {func.path}"
+        )
+    
     # Detect how to reference
     #if func.visibility != cx_ast.Member.Visibility.Public:
     pubCastKey = makePubCastKey(func)

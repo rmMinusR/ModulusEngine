@@ -69,12 +69,13 @@ class SymbolPath:
     def __init__(this):
         this.__parts:list[SymbolPath.SegmentAny] = []
 
-    def __str__(this): return "::" + "::".join([str(i) for i in this.__parts])
+    def __str__(this): return "::" + "::".join([str(i) for i in this.__parts if i != ""])
     def __repr__(this): return this.__str__()
     
     def __hash__(this): return hash(this.__str__())
 
     def __div__(this, rhs:"SymbolPath.SegmentAny"):
+        #if rhs == "": return this # Short circuit: prevent ::::Symbol
         out = SymbolPath()
         out.__parts.extend(this.__parts)
         out.__parts.append(rhs)
@@ -96,7 +97,7 @@ class SymbolPath:
 
     @cached_property
     def parent(this) -> "SymbolPath|None":
-        if len(this.__parts) > 1:
+        if len(this.__parts) > 0:
             out = SymbolPath()
             out.__parts = this.__parts[:-1]
             return out
