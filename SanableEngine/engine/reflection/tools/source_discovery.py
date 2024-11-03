@@ -179,19 +179,20 @@ class Project:
 
 class ProjectDiff:
 	def __init__(this, oldProj: Project|None, newProj: Project):
-		lookupMatchingFile = lambda file, _list: next(filter(lambda i: i.path == file.path, _list), None)
+		lookupMatchingFile = lambda file, _list: next((i for i in _list if i.abspath == file.abspath), None)
 		
 		def isUpToDate(file: SourceFile):
 			if oldProj == None: return False
 			oldMatch:SourceFile = lookupMatchingFile(file, oldProj.files)
 			newMatch:SourceFile = lookupMatchingFile(file, newProj.files)
+			if oldMatch == None and newMatch == None: return True # External dependency: assume unchanged - TODO is this bad?
 			if oldMatch.contentsHash != newMatch.contentsHash: return False
 			if oldMatch.includes != newMatch.includes: return False
 
 			return all((isUpToDate(i) for i in oldMatch.includes))
 			
-		existedPreviously = lambda file: any((i.path == file.path for i in oldProj.files)) if oldProj!=None else False
-		existsCurrently   = lambda file: any((i.path == file.path for i in newProj.files))
+		existedPreviously = lambda file: any((i.abspath == file.abspath for i in oldProj.files)) if oldProj!=None else False
+		existsCurrently   = lambda file: any((i.abspath == file.abspath for i in newProj.files))
 		
 		this.upToDate = [i for i in newProj.files if existedPreviously(i) and isUpToDate(i)]
 		this.outdated = [i for i in newProj.files if existedPreviously(i) and not isUpToDate(i)]

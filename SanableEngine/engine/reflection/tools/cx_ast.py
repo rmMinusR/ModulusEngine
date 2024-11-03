@@ -198,20 +198,35 @@ class Module:
 
         # Transient, only used during linking
         # Dependency injection by reader implementation
-        this.externals:"dict[SymbolPath, Any]" = {}
+        this.externals:"dict[SymbolPath, list[Module.LazyExternal]]" = {}
         this.findExternal:Callable[[SymbolPath], list[ASTNode]] = None
-        
+    
+    class LazyExternal:
+        def __init__(this, cursor:"Any", parent:ASTNode, sourceLoc:SourceLocation):
+            this.cursor = cursor
+            this.parent = parent
+            this.sourceLoc = sourceLoc
+            this.expanded:bool = False
+            this.astNode:None|ASTNode = None
+
     def __getstate__(this):
+        # Symbols we own
         out = [i for i in this.contents.values() if isinstance(i, ASTNode) and not i.transient] \
             + [[i for i in grp if not i.transient] for grp in this.contents.values() if isinstance(grp, list)]
         out.sort(key=lambda node: str(node.path if isinstance(node, ASTNode) else node[0].path))
-        return out
-    
-    def __setstate__(this, vals):
-        this.contents = dict()
-        this.byType = dict()
-        this.__concurrentlyAdded = []
+        
+        # Externally included symbols
+        externals = [[i.astNode for i in grp if i.astNode != None] for grp in this.externals.values()]
+        externals = [grp for grp in externals if len(grp)>0]
+        externals = [i for grp in externals for i in grp]
 
+        return (out, externals)
+    
+    def __setstate__(this, _vals:"tuple[ list[ASTNode|list[ASTNode]] , list[ASTNode] ]"):
+        vals, externals = _vals
+        this.__init__() # Note: caller will have to set findExternal
+
+        # Sort symbols we own into their fast lookup structures
         def _put_byType(i:ASTNode):
             if type(i) not in this.byType.keys(): this.byType[type(i)] = []
             this.byType[type(i)].append(i)
@@ -224,6 +239,14 @@ class Module:
                 if not i[0].path in this.contents.keys(): this.contents[i[0].path] = []
                 this.contents[i[0].path].extend(i)
                 for j in i: _put_byType(j)
+        
+        # Fake the symbols we don't own
+        for i in externals:
+            if i.path not in this.externals.keys(): this.externals[i.path] = []
+            tmp = Module.LazyExternal(None, None, None)
+            tmp.expanded = True
+            tmp.astNode = i
+            this.externals[i.path].append(tmp)
 
     def register(this, node:ASTNode):
         if this.__linking:

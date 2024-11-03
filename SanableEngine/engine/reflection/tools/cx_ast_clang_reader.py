@@ -131,14 +131,6 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
         else:
             config.logger.debug(f"Skipping symbol of unhandled kind {kind}")
     
-    class LazyExternal:
-        def __init__(this, cursor, parent, sourceLoc):
-            this.cursor = cursor
-            this.parent = parent
-            this.sourceLoc = sourceLoc
-            this.expanded = False
-            this.astNode = None
-
     def __ingestExternal(this, parent:cx_ast.ASTNode, cursor:Cursor) -> cx_ast.ASTNode|None:
         path = this.__cursorPath(parent, cursor)
         sourceLoc = makeSourceLocation(cursor, this.project)
@@ -152,7 +144,7 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
             
         if not alreadyExists:
             # Lazy traversal - save for later in case it's needed
-            this.module.externals[path].append(ClangParseContext.LazyExternal(cursor, parent, sourceLoc))
+            this.module.externals[path].append(cx_ast.Module.LazyExternal(cursor, parent, sourceLoc))
             
     def __tryFindExternal(this, pathRequested:cx_ast.SymbolPath) -> list[cx_ast.ASTNode]:
         if pathRequested in this.module.externals.keys():
@@ -178,7 +170,8 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
 
         # Check panic condition: can't locate (probably in system libs)
         if longestKnownPath not in this.module.externals.keys():
-            config.logger.warning(f"Could not locate external(?) symbol: {pathRequested}")
+            if pathRequested.startsWith( cx_ast.SymbolPath()+"std" ): # Raise warning if (probably) outside standard library
+                config.logger.warning(f"Could not locate external(?) symbol: {pathRequested}")
             return None
 
         # Expand each candidate

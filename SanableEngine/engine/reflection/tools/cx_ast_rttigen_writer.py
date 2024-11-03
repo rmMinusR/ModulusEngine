@@ -155,10 +155,14 @@ def _getAllParents(ty:cx_ast.StructInfo):
     
     return out
 
+def _isTemplate(sym:cx_ast.ASTNode):
+    if any(isinstance(i, cx_ast.TemplateParameter) for i in sym.children): return True
+    return sym.owner != None and _isTemplate(sym.owner)
+
 @RttiRenderer(cx_ast.StructInfo)
 def render_type(ty:cx_ast.StructInfo):
     # Don't write template types (for now)
-    if ty.path.isDynamicallyInstanced: return None
+    if _isTemplate(ty): return None
 
     preDecls :list[str] = []
     bodyDecls:list[str] = [f"TypeBuilder builder = TypeBuilder::create<{ty.path}>();"]
@@ -235,7 +239,7 @@ def render_field(field:cx_ast.FieldInfo):
 @MemRttiRenderer(cx_ast.ConstructorInfo)
 def render_constructor(ctor:cx_ast.ConstructorInfo):
     # Don't write template callables
-    if ctor.path.isDynamicallyInstanced: return None
+    if _isTemplate(ctor): return None
 
     if ctor.owner.isAbstract: return ("", f"//Skipping abstract constructor {ctor.path}")
     if ctor.deleted: return ("", f"//Skipping deleted constructor {ctor.path}")
@@ -254,7 +258,7 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
 @MemRttiRenderer(cx_ast.MemFuncInfo)
 def render_memFunc(func:cx_ast.MemFuncInfo):
     # Don't write template callables
-    if func.path.isDynamicallyInstanced: return None
+    if _isTemplate(func): return None
 
     # Detect how to reference
     #if func.visibility != cx_ast.Member.Visibility.Public:
@@ -289,7 +293,7 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
 @MemRttiRenderer(cx_ast.StaticFuncInfo)
 def render_memStaticFunc(func:cx_ast.StaticFuncInfo):
     # Don't write template callables
-    if func.path.isDynamicallyInstanced: return None
+    if _isTemplate(func): return None
 
     # Detect how to reference
     #if func.visibility != cx_ast.Member.Visibility.Public:
