@@ -490,7 +490,7 @@ def _make_FullyQualifiedPath(target:Type):
         return cx_ast.QualifiedPath(
             base=_make_FullyQualifiedPath(target.get_pointee()),
             qualifiers=qualifiers,
-            pointer_spec=cx_ast.QualifiedPath.Spec.REFERENCE # TODO move-reference support
+            pointer_spec=cx_ast.QualifiedPath.Spec.MOVE_REFERENCE if target.spelling.endswith("&&") else cx_ast.QualifiedPath.Spec.REFERENCE
         )
     elif target.get_declaration().kind == CursorKind.NO_DECL_FOUND:
         # Template parameter or fundamental literal type
