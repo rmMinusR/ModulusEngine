@@ -25,8 +25,15 @@ class ClangParseContext(cx_ast_tooling.ASTParser):
         timings.switchTask(timings.TASK_ID_WALK_AST_INTERNAL)
 
         # Do removal of outdated/removed symbols
+        allSymbolsFlat = [i for i in this.module.contents.values() if isinstance(i, cx_ast.ASTNode)]
+        for i in this.module.contents.values():
+            if not isinstance(i, cx_ast.ASTNode): allSymbolsFlat += i
+            
         for source in this.diff.outdated+this.diff.removed:
-            symbolsToRemove = [i for i in this.module.contents.values() if i.sourceFile == source]
+            def isOurs(i:cx_ast.ASTNode):
+                if i.definitionLocation != None: return i.definitionLocation.file == source
+                else: return any(j.file == source for j in i.declarationLocations)
+            symbolsToRemove = [i for i in allSymbolsFlat if isOurs(i)]
             for i in symbolsToRemove:
                 this.module.remove(i)
 

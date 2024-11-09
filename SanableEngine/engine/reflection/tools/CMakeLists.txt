@@ -4,6 +4,7 @@ set (CMAKE_CXX_STANDARD 17)
 project("engine-reflection-tools")
 
 option(STIX_RTTIGEN_PROFILING "Enable profiling during reflection generation time" FALSE)
+set(STIX_DEFAULT_TEMPLATE_FILE "${CMAKE_CURRENT_LIST_DIR}/rtti.template.cpp" CACHE STRING "Default template file containing binders")
 
 # Optional property setters. Must be set before calling stix_generate_reflection.
 
@@ -71,7 +72,7 @@ function(stix_generate_reflection targetName)
 	# Resolve optional properties
 	get_target_property(TEMPLATE_FILE ${targetName} STIX_TEMPLATE_FILE)
 	if (TEMPLATE_FILE STREQUAL "TEMPLATE_FILE-NOTFOUND")
-		set(TEMPLATE_ARG )
+		set(TEMPLATE_ARG --template ${STIX_DEFAULT_TEMPLATE_FILE})
 	else()
 		set(TEMPLATE_ARG --template ${TEMPLATE_FILE})
 	endif()
