@@ -400,10 +400,14 @@ class Annotation(ASTNode):
     
 
 class StructInfo(ASTNode):
-    def __init__(this, path:SymbolPath, location: SourceLocation, isDefinition:bool, isAbstract:bool):
+    def __init__(this, path:SymbolPath, location: SourceLocation, isDefinition:bool, isAbstract:bool=False): # If available, saves time
         ASTNode.__init__(this, path, location, isDefinition)
-        this.isAbstract = isAbstract
+        this.__isAbstract = isAbstract
         
+    @property
+    def isAbstract(this):
+        return this.__isAbstract or any(i.isAbstract for i in this.children if isinstance(i, MaybeVirtual))
+
     @property
     def immediateParents(this):
         return (i for i in this.children if isinstance(i, ParentInfo))
@@ -421,7 +425,7 @@ class StructInfo(ASTNode):
             # Implicit default ctor
             if not any((isinstance(i, DestructorInfo) for i in this.children)):
                 dtorPathPart = SymbolPath.CallParameterized(f"~{this.path.ownName}", [], [])
-                implicitDefaultDtor = DestructorInfo(this.path+dtorPathPart, this.definitionLocation, True, Member.Visibility.Public, False, False, False, True)
+                implicitDefaultDtor = DestructorInfo(this.path+dtorPathPart, this.definitionLocation, True, Member.Visibility.Public, False, False, False, False, True)
                 implicitDefaultDtor.transient = True
                 module.register(implicitDefaultDtor)
                 this.children.append(implicitDefaultDtor)
@@ -515,20 +519,25 @@ class Member(ASTNode):
 class MaybeVirtual(Member):
     __metaclass__ = abc.ABCMeta
     
-    def __init__(this, path:SymbolPath, location:SourceLocation, isDefinition:bool, visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool):
+    def __init__(this, path:SymbolPath, location:SourceLocation, isDefinition:bool, visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool, isExplicitAbstract:bool):
         Member.__init__(this, path, location, isDefinition, visibility)
         this.isExplicitVirtual = isExplicitVirtual
         this.isExplicitOverride = isExplicitOverride
+        this.isExplicitAbstract = isExplicitAbstract
         this.inheritedFrom = None
         this.inheritedVersion = None
         this.isVirtual = None
         this.isOverride = None
-        
+    
+    @property
+    def isAbstract(this): # FIXME make variable at link time instead
+        return this.isExplicitAbstract or (this.isVirtual and this.inheritedVersion != None and this.inheritedVersion.isAbstract)
+
     def latelink(this, module: Module):
         this.inheritedVersion = module.find(this.path.parent).findInParents(this.path.ownName)
         
-        def __isVirtual (v:MaybeVirtual): return v.isExplicitVirtual  or (__isVirtual (v.inheritedVersion) if v.inheritedVersion != None else False)
-        def __isOverride(v:MaybeVirtual): return v.isExplicitOverride or (__isOverride(v.inheritedVersion) if v.inheritedVersion != None else False)
+        def __isVirtual (v:MaybeVirtual): return v.isExplicitVirtual  or (v.inheritedVersion != None and __isVirtual (v.inheritedVersion))
+        def __isOverride(v:MaybeVirtual): return v.isExplicitOverride or (v.inheritedVersion != None and __isOverride(v.inheritedVersion))
         this.isVirtual = __isVirtual(this)
         this.isOverride = __isOverride(this)
 
@@ -600,10 +609,10 @@ class GlobalFuncInfo(Callable):
 
 class MemFuncInfo(MaybeVirtual, Callable):
     def __init__(this, path:SymbolPath, location:SourceLocation, isDefinition:bool,
-                visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool,\
+                visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool, isExplicitAbstract:bool,
                 returnTypeName:str, deleted:bool, inline:bool,
                 isThisObjConst:bool, isThisObjVolatile:bool):
-        MaybeVirtual.__init__(this, path, location, isDefinition, visibility, isExplicitVirtual, isExplicitOverride)
+        MaybeVirtual.__init__(this, path, location, isDefinition, visibility, isExplicitVirtual, isExplicitOverride, isExplicitAbstract)
         Callable    .__init__(this, path, location, isDefinition, returnTypeName, deleted, inline)
         this.isThisObjConst = isThisObjConst
         this.isThisObjVolatile = isThisObjVolatile
@@ -617,9 +626,9 @@ class ConstructorInfo(Member, Callable):
 
 class DestructorInfo(MaybeVirtual, Callable):
     def __init__(this, path:SymbolPath, location:SourceLocation, isDefinition:bool,
-                visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool,\
+                visibility:Member.Visibility, isExplicitVirtual:bool, isExplicitOverride:bool, isExplicitAbstract:bool,
                 deleted:bool, inline:bool):
-        MaybeVirtual.__init__(this, path, location, isDefinition, visibility, isExplicitVirtual, isExplicitOverride)
+        MaybeVirtual.__init__(this, path, location, isDefinition, visibility, isExplicitVirtual, isExplicitOverride, isExplicitAbstract)
         Callable    .__init__(this, path, location, isDefinition, None, deleted, inline)
 
     def latelink(this, module: Module):

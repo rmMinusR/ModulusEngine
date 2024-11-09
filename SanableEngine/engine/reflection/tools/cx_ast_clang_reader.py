@@ -251,8 +251,7 @@ def factory_StructInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTN
     return cx_ast.StructInfo(
         path,
         makeSourceLocation(cursor, project),
-        cursor.is_definition(),
-        cursor.is_abstract_record()
+        cursor.is_definition()
     ) # TODO add visibility specifier
 
 @ASTFactory(CursorKind.FIELD_DECL)
@@ -303,6 +302,7 @@ def factory_DestructorInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.
         makeVisibility(cursor),
         isExplicitVirtualMethod(cursor),
         isExplicitOverride(cursor),
+        cursor.is_pure_virtual_method(),
         cursor.is_deleted_method(),
         False # TODO inline support
     )
@@ -323,6 +323,7 @@ def factory_FuncInfo_MemberOrStaticOrGlobal(path:cx_ast.SymbolPath, cursor:Curso
                 makeVisibility(cursor),
                 isExplicitVirtualMethod(cursor),
                 isExplicitOverride(cursor),
+                cursor.is_pure_virtual_method(),
                 _make_FullyQualifiedPath(cursor.result_type),
                 cursor.is_deleted_method(),
                 False, # TODO inline support
