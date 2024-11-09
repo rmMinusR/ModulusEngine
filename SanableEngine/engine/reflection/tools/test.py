@@ -1,25 +1,41 @@
+import shutil
 import typing
 import unittest
 import os
 
 import source_discovery
 
+selfpath = os.path.dirname(os.path.realpath(__file__))
+
 class TestDiffs(unittest.TestCase):
     
     @classmethod
     def setUpClass(this):
-        this.selfpath = os.path.dirname(os.path.realpath(__file__))
+        tempDir = os.path.join( selfpath, "test_data", "__TEMP__")
+        if os.path.exists(tempDir): shutil.rmtree(tempDir)
+        
+        def makeProj(relpath:str, includeDirs:list[str]=[]):
+            try:
+                if relpath != None: shutil.copytree(os.path.join( selfpath, "test_data", *(relpath.split("/")) ), tempDir)
+                else: os.mkdir(tempDir)
+                os.chdir(tempDir)
+                proj = source_discovery.Project(["."], includeDirs)
+                os.chdir(selfpath)
+                return proj
+            finally:
+                shutil.rmtree(tempDir)
 
-        emptyDir = os.path.join( this.selfpath, "test_data", "diffs", "empty")
+        emptyDir = os.path.join( selfpath, "test_data", "diffs", "empty")
         if not os.path.exists(emptyDir): os.mkdir(emptyDir)
             
-        os.chdir(emptyDir                                                        ) ; this.data_empty     = source_discovery.Project(".", [])
-        os.chdir(os.path.join( this.selfpath, "test_data", "diffs", "simple1"   )) ; this.data_simple1   = source_discovery.Project(".", [])
-        os.chdir(os.path.join( this.selfpath, "test_data", "diffs", "simple2"   )) ; this.data_simple2   = source_discovery.Project(".", [])
-        os.chdir(os.path.join( this.selfpath, "test_data", "diffs", "includes1" )) ; this.data_includes1 = source_discovery.Project(".", [])
-        os.chdir(os.path.join( this.selfpath, "test_data", "diffs", "includes2" )) ; this.data_includes2 = source_discovery.Project(".", [])
-        os.chdir(os.path.join( this.selfpath, "test_data", "diffs", "includes3" )) ; this.data_includes3 = source_discovery.Project(".", [])
-        os.chdir(this.selfpath)
+        this.data_empty     = makeProj(None             )
+        this.data_simple1   = makeProj("diffs/simple1"  )
+        this.data_simple2   = makeProj("diffs/simple2"  )
+        this.data_includes1 = makeProj("diffs/includes1")
+        this.data_includes2 = makeProj("diffs/includes2")
+        this.data_includes3 = makeProj("diffs/includes3")
+        
+        os.chdir(selfpath)
         assert this.data_simple1.files[0].contents != this.data_simple2.files[0].contents
 
     def test_fresh(this):
