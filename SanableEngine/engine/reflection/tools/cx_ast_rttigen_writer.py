@@ -159,13 +159,20 @@ def _isTemplate(sym:cx_ast.ASTNode):
     if any(isinstance(i, cx_ast.TemplateParameter) for i in sym.children): return True
     return sym.owner != None and _isTemplate(sym.owner)
 
+def _idLoc(sym:cx_ast.ASTNode, lower=False):
+    if sym.transient: out = "Implicitly created"
+    elif sym.definitionLocation != None: out = f"Defined at {sym.definitionLocation}"
+    else: out = "Declared at "+(", ".join(str(i) for i in sym.declarationLocations))
+    if lower: out = out[0].lower() + out[1:]
+    return out
+
 @RttiRenderer(cx_ast.StructInfo)
 def render_type(ty:cx_ast.StructInfo):
     # Don't write template types (for now)
     if _isTemplate(ty): return None
 
     preDecls :list[str] = []
-    bodyDecls:list[str] = [f"TypeBuilder builder = TypeBuilder::create<{ty.path}>();"]
+    bodyDecls:list[str] = [f"TypeBuilder builder = TypeBuilder::create<{ty.path}>(); // {_idLoc(ty)}"]
 
     # Render children
     for mem in ty.children:
@@ -232,7 +239,7 @@ def render_field(field:cx_ast.FieldInfo):
     #    pubReference = f"[]({field.astParent.path}*)" + "{ " + f"return offsetof({field.path});" + " }"
 
     # TODO handle anonymous types (especially if private)
-    body = f'builder.addField<{field.typeName}>("{field.path.ownName}", {pubReference});'
+    body = f'builder.addField<{field.typeName}>("{field.path.ownName}", {pubReference}); // {_idLoc(field)}'
     
     return (preDecl, body)
 
@@ -241,8 +248,8 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
     # Don't write template callables
     if _isTemplate(ctor): return None
 
-    if ctor.owner.isAbstract: return ("", f"//Skipping abstract constructor {ctor.path}")
-    if ctor.deleted: return ("", f"//Skipping deleted constructor {ctor.path}")
+    if ctor.owner.isAbstract: return ("", f"//Skipping abstract constructor {ctor.path} {_idLoc(ctor, lower=True)}")
+    if ctor.deleted: return ("", f"//Skipping deleted constructor {ctor.path} {_idLoc(ctor, lower=True)}")
 
     #paramNames = [i.displayName for i in ctor.parameters] # TODO implement name capture
     paramTypes = ", ".join([str(i.typeName) for i in ctor.parameters]) # Can't rely on template arg deduction in case of overloading
@@ -251,9 +258,9 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
     ctorThunkInstance = thunkUtilsInstance+f"::thunk_newInPlace<{paramTypes}>"
     
     if ctor.visibility == cx_ast.Member.Visibility.Public or ctor.owner.isFriended(lambda f: thunkUtilsInstance in f.targetName):
-        return ("", f"builder.addConstructor(stix::StaticFunction::make(&{ctorThunkInstance}), {ctor.visibility});")
+        return ("", f"builder.addConstructor(stix::StaticFunction::make(&{ctorThunkInstance}), {ctor.visibility}); // {_idLoc(ctor)}")
     else:
-        return ("", f"//Skipping inaccessible constructor {ctor.path}")
+        return ("", f"//Skipping inaccessible constructor {ctor.path} {_idLoc(ctor, lower=True)}")
 
 @MemRttiRenderer(cx_ast.MemFuncInfo)
 def render_memFunc(func:cx_ast.MemFuncInfo):
@@ -263,7 +270,7 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
     if func.deleted:
         return (
             f"//Cannot capture deleted function {func.path}",
-            f"//Cannot capture deleted function {func.path}"
+            f"//Cannot capture deleted function {func.path} {_idLoc(func, lower=True)}"
         )
     
     # Detect how to reference
@@ -289,7 +296,7 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
         
     # Render body
     paramNames = [i.path.ownName for i in func.parameters] # TODO implement name capture on C++ side
-    body = f"builder.addMemberFunction(stix::MemberFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility}, {str(func.isVirtual).lower()});"
+    body = f"builder.addMemberFunction(stix::MemberFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility}, {str(func.isVirtual).lower()}); // {_idLoc(func)}"
 
     return (preDecl, body)
 
@@ -301,7 +308,7 @@ def render_memStaticFunc(func:cx_ast.StaticFuncInfo):
     if func.deleted:
         return (
             f"//Cannot capture deleted function {func.path}",
-            f"//Cannot capture deleted function {func.path}"
+            f"//Cannot capture deleted function {func.path} {_idLoc(func, lower=True)}"
         )
     
     # Detect how to reference
@@ -325,7 +332,7 @@ def render_memStaticFunc(func:cx_ast.StaticFuncInfo):
     #    pubReference = func.path
    
     #paramNames = [i.displayName for i in func.parameters] # TODO implement name capture on C++ side
-    body = f"builder.addStaticFunction(stix::StaticFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility});"
+    body = f"builder.addStaticFunction(stix::StaticFunction::make({pubReference}), \"{func.path.ownName.base}\", {func.visibility}); // {_idLoc(func)}"
     # TODO handle template funcs
 
     return (preDecl, body)
