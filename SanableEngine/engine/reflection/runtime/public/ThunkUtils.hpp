@@ -9,7 +9,7 @@ typedef void (*dtor_t)(void*); //CANNOT be a std::function or lambda because des
 
 
 ENGINE_RTTI_API ptrdiff_t _captureCastOffset(const DetectedConstants& image, void*(*castThunk)(void*)); //TODO implement
-ENGINE_RTTI_API DetectedConstants _captureVtablesInternal(size_t objSize, void(*thunk)(), const std::vector<void(*)()>& allocators, const std::vector<void(*)()>& nofill);
+ENGINE_RTTI_API DetectedConstants _captureVtablesInternal(size_t objSize, void(*thunk)(), size_t destructorCallCount, const std::vector<void(*)()>& allocators, const std::vector<void(*)()>& nofill);
 
 
 template<typename T>
@@ -27,6 +27,9 @@ private:
 
 	template<typename... Args>
 	static void _simulated_thunk_newInPlace(Args... args) { new(dummyAllocator<0>()) T(std::forward<Args>(args)...); }
+
+	template<typename _Ty>
+	constexpr static bool requires_destruction = std::is_destructible_v<_Ty> && !std::is_trivially_destructible_v<_Ty> && !std::is_reference_v<_Ty>;
 public:
 	template<typename... Args>
 	static inline DetectedConstants analyzeConstructor()
@@ -34,6 +37,7 @@ public:
 		return _captureVtablesInternal(
 			sizeof(T),
 			(void(*)()) &_simulated_thunk_newInPlace<Args...>,
+			( size_t(requires_destruction<Args>) + ... + 0 ),
 			{
 				(void(*)()) &dummyAllocator<0>,
 				(void(*)()) &malloc,

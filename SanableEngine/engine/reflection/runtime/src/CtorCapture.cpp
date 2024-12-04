@@ -24,7 +24,7 @@ ptrdiff_t _captureCastOffset(const DetectedConstants& image, void(*castThunk)())
 }
 */
 
-DetectedConstants _captureVtablesInternal(size_t objSize, void(*thunk)(), const std::vector<void(*)()>& allocators, const std::vector<void(*)()>& nofill)
+DetectedConstants _captureVtablesInternal(size_t objSize, void(*thunk)(), size_t destructorCallCount, const std::vector<void(*)()>& allocators, const std::vector<void(*)()>& nofill)
 {
 	//Setup
 	SemanticVM::ExecutionOptions options;
@@ -34,7 +34,7 @@ DetectedConstants _captureVtablesInternal(size_t objSize, void(*thunk)(), const 
 
 	//Only allow constructor and thunk to run (GCC: full-constructor, which has vtables. We don't care about base constructor.)
 	options.isSandboxAllowList = true;
-	options.sandboxed = { thunk, (void(*)())getLastSubFunction(thunk) };
+	options.sandboxed = { thunk, (void(*)())getLastSubFunction(thunk, destructorCallCount) };
 
 	//Unwrap aliases
 	for (auto i : allocators) { auto unwrapped = unwrapAliaFunction(i); if (unwrapped != i) options.allocators.push_back(i); }
