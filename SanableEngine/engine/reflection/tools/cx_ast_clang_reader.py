@@ -274,7 +274,7 @@ def factory_FieldInfo(path:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNo
 def factory_ParentInfo(ownPath:cx_ast.SymbolPath, cursor:Cursor, parent:cx_ast.ASTNode, module:cx_ast.Module, project:Project):
     return cx_ast.ParentInfo(
         ownPath.parent,
-        _make_FullSymbolPath(cursor),
+        _make_FullSymbolPath(cursor.referenced),
         makeSourceLocation(cursor, project),
         makeVisibility(cursor),
         any([i.spelling == "virtual" for i in cursor.get_tokens()])

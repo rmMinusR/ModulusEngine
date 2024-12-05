@@ -322,8 +322,25 @@ class TestParser:
         tgt = next(( i for i in tgt.children if isinstance(i, cx_ast.TemplateParameter) ), None)
         this.assertTrue(tgt != None)
         this.assertTrue(tgt.paramType == "typename" and tgt.paramName == "" and tgt.defaultValue == "int")
+    
+    def test_virtual_overriding(this):
+        # Funcs
+        for p1,baseIsAbstract in { "VirtBaseFunc":False, "AbstrBaseFunc":True }.items():
+            for p2 in ["ExplicitVirt", "ImplicitVirt"]:
+                for p3 in ["ExplicitOverride", "ImplicitOverride"]:
+                    for p4,shouldBeAbstract in { "Concrete":False, "Abstracted":True }.items():
+                        sym:cx_ast.MemFuncInfo = this.assertExpectSymbol([ "Overriding", f"{p1}_{p2}_{p3}_{p4}", CallParams("foo", []) ], cx_ast.MemFuncInfo)
+                        this.assertTrue(sym.isVirtual, "Tested func should always be virtual")
+                        this.assertEqual(shouldBeAbstract, sym.isAbstract, f"{p1}_{p2}_{p3}_{p4}'s foo() should be "+("abstract" if shouldBeAbstract else "concrete"))
         
-        
+        # Ctors
+        sym:cx_ast.DestructorInfo = this.assertExpectSymbol([ "Overriding", "ImplicitVirtDtor", CallParams("~ImplicitVirtDtor", []) ], cx_ast.DestructorInfo)
+        this.assertTrue(sym.isVirtual)
+        sym:cx_ast.DestructorInfo = this.assertExpectSymbol([ "Overriding", "ExplicitVirtDtor", CallParams("~ExplicitVirtDtor", []) ], cx_ast.DestructorInfo)
+        this.assertTrue(sym.isVirtual)
+        sym:cx_ast.DestructorInfo = this.assertExpectSymbol([ "Overriding", "ExplicitDtorImplicitlyVirt", CallParams("~ExplicitDtorImplicitlyVirt", []) ], cx_ast.DestructorInfo)
+        this.assertTrue(sym.isVirtual)
+
 from cx_ast_clang_reader import ClangParseContext
 class TestClangParser(TestParser, unittest.TestCase):
     def invoke_parser(target:str, includes:list[str]):

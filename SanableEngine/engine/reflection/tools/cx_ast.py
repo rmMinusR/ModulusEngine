@@ -523,16 +523,12 @@ class MaybeVirtual(Member):
         Member.__init__(this, path, location, isDefinition, visibility)
         this.isExplicitVirtual = isExplicitVirtual
         this.isExplicitOverride = isExplicitOverride
-        this.isExplicitAbstract = isExplicitAbstract
+        this.isAbstract = isExplicitAbstract
         this.inheritedFrom = None
         this.inheritedVersion = None
         this.isVirtual = None
         this.isOverride = None
     
-    @property
-    def isAbstract(this): # FIXME make variable at link time instead
-        return this.isExplicitAbstract or (this.isVirtual and this.inheritedVersion != None and this.inheritedVersion.isAbstract)
-
     def latelink(this, module: Module):
         this.inheritedVersion = module.find(this.path.parent).findInParents(this.path.ownName)
         
