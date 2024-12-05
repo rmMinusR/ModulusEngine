@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "GlobalTypeRegistry.hpp"
+#include "ModuleTypeRegistry.hpp"
 
 TypeInfo::TypeInfo() :
 	hash(0)
@@ -80,7 +81,7 @@ const FieldInfo* TypeInfo::Layout::getField(const std::string& name, MemberVisib
 		{
 			if ((int)parent.visibility & (int)visibilityFlags)
 			{
-				const FieldInfo* out = parent.typeName.resolve()->layout.getField(name, visibilityFlags, true);
+				const FieldInfo* out = parent.typeName.resolve(ownModule)->layout.getField(name, visibilityFlags, true);
 				if (out) return out;
 			}
 		}
@@ -106,7 +107,7 @@ std::optional<ParentInfo> TypeInfo::Layout::getParent_internal(const TypeName& o
 	{
 		for (const ParentInfo& parent : parents)
 		{
-			const TypeInfo* ti = parent.typeName.resolve();
+			const TypeInfo* ti = parent.typeName.resolve(ownModule);
 			if (ti)
 			{
 				std::optional<ParentInfo> baseOfVbase = ti->getParent(name, visibilityFlags, includeInherited);
@@ -142,7 +143,8 @@ void TypeInfo::Layout::walkFields(std::function<void(const FieldInfo&)> visitor,
 		{
 			if ((int)parent.visibility & (int)visibilityFlags)
 			{
-				const TypeInfo* parentType = parent.typeName.resolve();
+				const TypeInfo* parentType = parent.typeName.resolve(ownModule);
+
 				if (parentType)
 				{
 					//Can't walk what isn't loaded
@@ -236,7 +238,7 @@ bool TypeInfo::Layout::isDerivedFrom(const TypeName& type, bool grandparents) co
 	{
 		for (const ParentInfo& p : parents)
 		{
-			if (p.typeName.resolve()->layout.isDerivedFrom(type, grandparents)) return true;
+			if (p.typeName.resolve(ownModule)->layout.isDerivedFrom(type, grandparents)) return true;
 		}
 	}
 
@@ -324,10 +326,11 @@ const stix::StaticFunction* TypeInfo::Capabilities::getStaticFunction(const std:
 	return nullptr;
 }
 
-void TypeInfo::doLateBinding()
+void TypeInfo::doLateBinding(ModuleTypeRegistry* ownModule)
 {
 	//Deferred from captureCDO: Mark all fields as used
 	assert(!layout.byteUsage.empty());
+	layout.ownModule = ownModule;
 	layout.walkFields(
 		[&](const FieldInfo& fi) {
 			ptrdiff_t root = fi.offset + (ptrdiff_t)this->layout.upcast(nullptr, fi.owner);

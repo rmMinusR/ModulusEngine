@@ -13,6 +13,7 @@
 #include "Function.hpp"
 
 class TypeBuilder;
+class ModuleTypeRegistry;
 
 /// <summary>
 /// For cases where we cannot use C++ builtin type_info.
@@ -34,6 +35,9 @@ public:
 	private:
 		std::vector<ParentInfo> parents;
 		std::vector<FieldInfo> fields; //NO TOUCHY! Use walkFields instead, which will also handle parent recursion.
+
+		ModuleTypeRegistry* ownModule = nullptr; // VERY stupid fix for out-of-order registration
+		friend class ModuleTypeRegistry;
 
 		/// <summary>
 		/// How is each byte used?
@@ -211,7 +215,7 @@ public:
 	/// <summary>
 	/// INTERNAL USE ONLY. Currently used to finalize byteUsage, since we need to be able to look up our parents' fields.
 	/// </summary>
-	ENGINE_RTTI_INTERNAL( void doLateBinding(); )
+	ENGINE_RTTI_INTERNAL( void doLateBinding(ModuleTypeRegistry* ownModule); )
 
 private:
 	/// <summary>

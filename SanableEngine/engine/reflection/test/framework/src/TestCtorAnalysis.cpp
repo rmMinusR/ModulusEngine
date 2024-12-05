@@ -104,12 +104,12 @@ void testCtorCaptureV2()
 				}
 			);
 			
-			/*
-			printf("v1: ");
+			//*
+			printf("v1 vptrs: ");
 			for (size_t i = 0; i < sizeof(T); ++i) printf("%02x ", (uint32_t)dummy[i]);
 			printf("\n");
 
-			printf("v2: ");
+			printf("v2 vptrs: ");
 			for (size_t i = 0; i < sizeof(T); ++i) if (vtables.usage[i]) printf("%02x ", (uint32_t)vtables.bytes[i]); else printf(".. ");
 			printf("\n");
 			// */

@@ -9,6 +9,7 @@
 #include "StaticTemplateUtils.inl"
 
 struct TypeInfo;
+class ModuleTypeRegistry;
 
 namespace stix::detail
 {
@@ -66,7 +67,7 @@ public:
 	ENGINE_RTTI_API std::optional<TypeName> dereference() const;
 
 	ENGINE_RTTI_API bool isValid() const; //Whether the name has a valid value. Does NOT indicate whether there is live type data backing it.
-	ENGINE_RTTI_API TypeInfo const* resolve() const;
+	ENGINE_RTTI_API TypeInfo const* resolve(ModuleTypeRegistry* moduleHint = nullptr) const;
 
 	ENGINE_RTTI_API bool operator==(const TypeName& other) const;
 	ENGINE_RTTI_API bool operator!=(const TypeName& other) const;
