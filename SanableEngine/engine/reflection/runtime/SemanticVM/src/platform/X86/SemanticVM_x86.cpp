@@ -121,10 +121,11 @@ bool SemanticVM::step_cmpmath(MachineState& state, const cs_insn* insn, const st
 		std::optional<bool> cf, of, sf, zf, af, pf;
 		SemanticValue op1 = state.getOperand(insn, 0);
 		SemanticValue op2 = state.getOperand(insn, 1);
-		SemanticKnownConst* c1 = op1.tryGetKnownConst();
-		SemanticKnownConst* c2 = op2.tryGetKnownConst();
-		if (c1 && c2)
+		if (op1.tryGetKnownConst() && op2.tryGetKnownConst())
 		{
+			SemanticKnownConst* c1 = op1.tryGetKnownConst();
+			SemanticKnownConst* c2 = op2.tryGetKnownConst();
+
 			SemanticKnownConst cSum = *(op1+op2).tryGetKnownConst();
 			SemanticKnownConst cDiff = *(op2-op1).tryGetKnownConst();
 			uint64_t msbMask = 1ull << (cDiff.size*8 - 1);
@@ -144,6 +145,37 @@ bool SemanticVM::step_cmpmath(MachineState& state, const cs_insn* insn, const st
 			//Aux carry: only if carry/borrow was generated in lowest 4 bits. TODO check
 			//See https://en.wikipedia.org/wiki/Half-carry_flag section on x86
 			af = ( (c1->bound()&0x0F) + (c2->bound()&0x0F) )&0x10;
+		}
+		else if (op1.tryGetMagic() && op2.tryGetMagic())
+		{
+			SemanticMagic* m1 = op1.tryGetMagic();
+			SemanticMagic* m2 = op2.tryGetMagic();
+			if (m1->id == m2->id)
+			{
+				SemanticKnownConst cSum(m1->offset + m2->offset, 8, false);
+				SemanticKnownConst cDiff(m2->offset - m1->offset, 8, false);
+				uint64_t msbMask = 1ull << (cDiff.size * 8 - 1);
+				sf = cDiff.value & msbMask; //Most significant bit is sign bit in both 1's and 2's compliment machines
+				pf = !(cDiff.value & 1); //Even or odd: check least significant bit
+				zf = cDiff.bound() == 0;
+
+				//CF and OF: see https://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
+				{
+					uint64_t parity = ((m1->offset & 1) + (m2->offset & 1)) >> 1; //Precompute first bit, as it would otherwise be lost in shift
+					cf = ((m1->offset >> 1) + (m2->offset >> 1) + parity) & msbMask //Adding would cause rollover
+						|| m2->offset > m1->offset; //Subtracting would cause borrow
+				}
+				of = (m1->offset & msbMask) == (m2->offset & msbMask)
+					&& (m1->offset & msbMask) != (cSum.bound() & msbMask);
+
+				//Aux carry: only if carry/borrow was generated in lowest 4 bits. TODO check
+				//See https://en.wikipedia.org/wiki/Half-carry_flag section on x86
+				af = ((m1->offset & 0x0F) + (m2->offset & 0x0F)) & 0x10;
+			}
+			else
+			{
+				reportError("Cannot compare: Magic value basis mismatched, result is indeterminate");
+			}
 		}
 		else if (op1.isUnknown() || op2.isUnknown())
 		{
