@@ -166,12 +166,11 @@ class ASTNode:
         return str(this)
     
     def merge(this, new:"ASTNode"): # Called on existing instance
-        # Already aware of this symbol: check that previous record was a declaration
-        if new.definitionLocation != None:
-            assert this.definitionLocation == None, f"Node {this} defined multiple times!"
-
         # Merge locational data
-        this.definitionLocation = new.definitionLocation
+        if new.definitionLocation != None:
+            # Check that previous record was a declaration
+            assert this.definitionLocation == None, f"Node {this} defined multiple times!"
+            this.definitionLocation = new.definitionLocation
         this.declarationLocations.extend(new.declarationLocations)
         
         # Move over children

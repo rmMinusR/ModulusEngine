@@ -257,7 +257,7 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
     thunkUtilsInstance = f"thunk_utils<{ctor.owner.path}>"
     ctorThunkInstance = thunkUtilsInstance+f"::thunk_newInPlace<{paramTypes}>"
     
-    if ctor.visibility == cx_ast.Member.Visibility.Public or ctor.owner.isFriended(lambda f: thunkUtilsInstance in f.targetName):
+    if ctor.visibility == cx_ast.Member.Visibility.Public or ctor.owner.isFriended(lambda f: thunkUtilsInstance in str(f.friendedSymbolPath)): # FIXME use path lookup instead?
         return ("", f"builder.addConstructor(stix::StaticFunction::make(&{ctorThunkInstance}), {ctor.visibility}); // {_idLoc(ctor)}")
     else:
         return ("", f"//Skipping inaccessible constructor {ctor.path} {_idLoc(ctor, lower=True)}")
