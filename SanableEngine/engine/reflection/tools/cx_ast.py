@@ -273,8 +273,12 @@ class Module:
         this.byType[type(node)].append(node)
 
     def remove(this, node:ASTNode):
-        del this.contents[node.path]
-        this.byType[type(node)].remove(node)
+        try: del this.contents[node.path]
+        except KeyError: pass
+
+        try: this.byType[type(node)].remove(node)
+        except ValueError: pass
+        
         if node.owner != None: node.owner.children.remove(node)
 
     def linkAll(this):
