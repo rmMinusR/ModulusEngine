@@ -4,6 +4,7 @@ set (CMAKE_CXX_STANDARD 17)
 project("engine-reflection-tools")
 
 option(STIX_RTTIGEN_PROFILING "Enable profiling during reflection generation time" FALSE)
+set(STIX_DEFAULT_TEMPLATE_FILE "${CMAKE_CURRENT_LIST_DIR}/rtti.template.cpp" CACHE STRING "Default template file containing binders")
 
 # Optional property setters. Must be set before calling stix_generate_reflection.
 
@@ -22,12 +23,56 @@ endfunction()
 
 # Main integration
 
-set(REFLECTION_COMMAND python "${CMAKE_CURRENT_LIST_DIR}/rttigen.py")
-function(stix_generate_reflection targetName rootDir)
+set(STIX_AST_COMMAND python "${CMAKE_CURRENT_LIST_DIR}/cx_ast_clang_reader.py")
+function(stix_extract_ast targetName rootDir)
+	# Add rootDir to STIX_ROOT_DIRS (allows more complex directory structure)
+	get_target_property(ROOT_DIRS ${targetName} STIX_ROOT_DIRS)
+	if (ROOT_DIRS STREQUAL "ROOT_DIRS-NOTFOUND")
+		set(ROOT_DIRS ${rootDir})
+	else()
+		list(APPEND ROOT_DIRS ${rootDir})
+	endif()
+	set_property(TARGET ${targetName} PROPERTY STIX_ROOT_DIRS ${ROOT_DIRS})
+
+	# Add RTTI generator target if none exists
+	if (NOT TARGET ${targetName}_STIX_AST)
+		get_target_property(OUTPUT_FILE_DIR ${targetName} BINARY_DIR)
+		set(AST_FILE "${OUTPUT_FILE_DIR}/generated-rtti/${targetName}.stix-ast")
+
+		if (STIX_RTTIGEN_PROFILING)
+			set(PROFILING_ARGS --task-profiling --call-profiling)
+		else()
+			set(PROFILING_ARGS )
+		endif()
+
+		add_custom_target(
+			${targetName}_STIX_AST
+			BYPRODUCTS "${AST_FILE}"
+ 			COMMAND ${STIX_AST_COMMAND}
+						--target $<TARGET_PROPERTY:${targetName},STIX_ROOT_DIRS>
+						--output "${AST_FILE}"
+ 						--include $<TARGET_PROPERTY:${targetName},INCLUDE_DIRECTORIES>
+ 						--define $<TARGET_PROPERTY:${targetName},COMPILE_DEFINITIONS>
+ 						${PROFILING_ARGS}
+ 						#-- $<TARGET_PROPERTY:${targetName},COMPILE_OPTIONS> $<TARGET_PROPERTY:${targetName},COMPILE_FLAGS> ${COMPILE_OPTIONS} ${COMPILE_FLAGS}
+			VERBATIM
+			USES_TERMINAL
+ 			COMMENT "Extracting AST for ${targetName}"
+ 		)
+	endif()
+endfunction()
+
+set(STIX_RTTI_CODEGEN_COMMAND python "${CMAKE_CURRENT_LIST_DIR}/cx_ast_rttigen_writer.py")
+function(stix_generate_reflection targetName)
+	# Requires stix_extract_ast() to be run before this
+	if (NOT TARGET ${targetName}_STIX_AST)
+		message(FATAL_ERROR "Missing AST data to generate RTTI binders for ${targetName} - call stix_extract_ast before stix_generate_reflection")
+	endif()
+
 	# Resolve optional properties
 	get_target_property(TEMPLATE_FILE ${targetName} STIX_TEMPLATE_FILE)
 	if (TEMPLATE_FILE STREQUAL "TEMPLATE_FILE-NOTFOUND")
-		set(TEMPLATE_ARG )
+		set(TEMPLATE_ARG --template ${STIX_DEFAULT_TEMPLATE_FILE})
 	else()
 		set(TEMPLATE_ARG --template ${TEMPLATE_FILE})
 	endif()
@@ -44,20 +89,11 @@ function(stix_generate_reflection targetName rootDir)
 		set(DEFAULT_IMAGE_CAPTURE_STATUS_ARG --default-image-capture-status ${DEFAULT_IMAGE_CAPTURE_STATUS})
 	endif()
 
-	# Add rootDir to STIX_ROOT_DIRS (allows more complex directory structure)
-	get_target_property(ROOT_DIRS ${targetName} STIX_ROOT_DIRS)
-	if (ROOT_DIRS STREQUAL "ROOT_DIRS-NOTFOUND")
-		set(ROOT_DIRS ${rootDir})
-	else()
-		list(APPEND ROOT_DIRS ${rootDir})
-	endif()
-	set_property(TARGET ${targetName} PROPERTY STIX_ROOT_DIRS ${ROOT_DIRS})
-
 	# Add RTTI generator target if none exists
-	if (NOT TARGET ${targetName}_RTTI)
+	if (NOT TARGET ${targetName}_STIX_RTTI)
 		get_target_property(OUTPUT_FILE_DIR ${targetName} BINARY_DIR)
+		set(AST_FILE "${OUTPUT_FILE_DIR}/generated-rtti/${targetName}.stix-ast")
 		set(OUTPUT_FILE "${OUTPUT_FILE_DIR}/generated-rtti/${targetName}_rtti.generated.cpp")
-		set(CACHE_FILE "${OUTPUT_FILE_DIR}/generated-rtti/${targetName}.rtticache")
 
 		if (STIX_RTTIGEN_PROFILING)
 			set(PROFILING_ARGS --task-profiling --call-profiling)
@@ -66,24 +102,22 @@ function(stix_generate_reflection targetName rootDir)
 		endif()
 
 		add_custom_target(
-			${targetName}_RTTI
-			BYPRODUCTS "${OUTPUT_FILE}" "${CACHE_FILE}"
- 			COMMAND ${REFLECTION_COMMAND} --target $<TARGET_PROPERTY:${targetName},STIX_ROOT_DIRS>
-										--output "${OUTPUT_FILE}"
-										--cache "${CACHE_FILE}"
- 										--include $<TARGET_PROPERTY:${targetName},INCLUDE_DIRECTORIES>
- 										--define $<TARGET_PROPERTY:${targetName},COMPILE_DEFINITIONS>
- 										${TEMPLATE_ARG}
-										${DEFAULT_IMAGE_CAPTURE_BACKEND_ARG}
-										${DEFAULT_IMAGE_CAPTURE_STATUS_ARG}
-										${PROFILING_ARGS}
- 										-- $<TARGET_PROPERTY:${targetName},COMPILE_OPTIONS> $<TARGET_PROPERTY:${targetName},COMPILE_FLAGS> ${COMPILE_OPTIONS} ${COMPILE_FLAGS}
+			${targetName}_STIX_RTTI
+			BYPRODUCTS "${OUTPUT_FILE}"
+ 			COMMAND ${STIX_RTTI_CODEGEN_COMMAND}
+						--input "${AST_FILE}"
+						--output "${OUTPUT_FILE}"
+ 						${TEMPLATE_ARG}
+						${DEFAULT_IMAGE_CAPTURE_BACKEND_ARG}
+						${DEFAULT_IMAGE_CAPTURE_STATUS_ARG}
+						${PROFILING_ARGS}
 			VERBATIM
 			USES_TERMINAL
+			DEPENDS ${targetName}_STIX_AST
  			COMMENT "Generating embedded RTTI for ${targetName}"
  		)
 
-		add_dependencies(${targetName} ${targetName}_RTTI)
+		add_dependencies(${targetName} ${targetName}_STIX_RTTI)
 
 		target_sources(${targetName} PRIVATE ${OUTPUT_FILE})
 	endif()

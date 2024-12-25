@@ -1,11 +1,12 @@
 #pragma once
 
 #include <filesystem>
+#include <ReflectionSpec.hpp>
 #include "dllapi.h"
 
 class SerialNode;
 
-class SerialFile
+class STIX_DISABLE_IMAGE_CAPTURE SerialFile
 {
 	SerialNode* rootNode;
 public:

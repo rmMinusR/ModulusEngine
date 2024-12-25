@@ -36,6 +36,7 @@ void* platform_getRelAddr(const cs_insn& insn);
 int printInstructionCursor(const cs_insn* insn);
 
 bool platform_isIf(const cs_insn& insn);
+void* platform_getJumpTarget(const cs_insn& insn); // Returns nullptr if indirect or indeterminate
 bool platform_isInterrupt(const cs_insn& insn);
 
 void* unwrapAliaFunction(void(*fn)()); //If function is an alias (ie. local-module memset aliasing to stdlib's memset), return the pointed-to function. Otherwise returns the original function.
@@ -43,7 +44,7 @@ void* unwrapAliaFunction(void(*fn)()); //If function is an alias (ie. local-modu
 //Note: These will only work on functions with linear execution
 void foreachSubFunction(void(*fn)(), const std::function<void( void(*)() )>& visitor);
 void* getSubFunction(void(*fn)(), int index);
-void* getLastSubFunction(void(*fn)());
+void* getLastSubFunction(void(*fn)(), size_t index=0);
 
 
 #if INTPTR_MAX == INT64_MAX

@@ -23,6 +23,14 @@ public:
 	/// <param name="hint">Parent type, can be null if unknown</param>
 	/// <returns>Pointer to matching type, or null if none was found</returns>
 	ENGINE_RTTI_API TypeInfo const* snipeType(void* obj, size_t size, TypeInfo const* hint = nullptr) const;
+
+	ENGINE_RTTI_API ModuleTypeRegistry();
+	ENGINE_RTTI_API ~ModuleTypeRegistry();
+
+	ENGINE_RTTI_API ModuleTypeRegistry(const ModuleTypeRegistry& cpy);
+	ENGINE_RTTI_API ModuleTypeRegistry(ModuleTypeRegistry&& mov);
+	ENGINE_RTTI_API ModuleTypeRegistry& operator=(const ModuleTypeRegistry& cpy);
+	ENGINE_RTTI_API ModuleTypeRegistry& operator=(ModuleTypeRegistry&& mov);
 	
 private:
 	std::vector<TypeInfo> types;
