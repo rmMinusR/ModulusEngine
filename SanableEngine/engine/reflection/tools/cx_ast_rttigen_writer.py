@@ -72,7 +72,7 @@ class RttiGenerator(cx_ast_tooling.ASTConsumer):
             if type(sym) in RttiGenerator.renderers.keys() and not isinstance(sym, cx_ast.Member):
                 if this.__isDefinitionOurs(sym):
                     genFn = RttiGenerator.renderers[type(sym)]
-                    generated = genFn(sym)
+                    generated = genFn(sym, this)
                     if generated != None:
                         forwardDecls.append(f"//Forward decls for {sym.path}\n"+generated[0])
                         bodyDecls   .append(generated[1])
@@ -82,12 +82,9 @@ class RttiGenerator(cx_ast_tooling.ASTConsumer):
         return (forwardDecls, bodyDecls)
     
     rendererOutput_t = tuple[str,str]|None
-    renderer_t = typing.Callable[[cx_ast.ASTNode], rendererOutput_t]
+    renderer_t = typing.Callable[[cx_ast.ASTNode, typing.Any], rendererOutput_t]
     renderers:dict[typing.Type, renderer_t] = dict() # Only applies to global symbols
     memRenderers:dict[typing.Type, renderer_t] = dict()
-
-    defaultImageCaptureStatus = "enabled"
-    defaultImageCaptureBackend = "disassembly"
 
     def __renderIncludes(this):
         includes:list[source_discovery.SourceFile] = list()
@@ -167,7 +164,7 @@ def _idLoc(sym:cx_ast.ASTNode, lower=False):
     return out
 
 @RttiRenderer(cx_ast.StructInfo)
-def render_type(ty:cx_ast.StructInfo):
+def render_type(ty:cx_ast.StructInfo, context:RttiGenerator):
     # Don't write template types (for now)
     if _isTemplate(ty): return None
 
@@ -178,7 +175,7 @@ def render_type(ty:cx_ast.StructInfo):
     for mem in ty.children:
         if type(mem) in RttiGenerator.memRenderers.keys():
             genFn = RttiGenerator.memRenderers[type(mem)]
-            memGenerated = genFn(mem)
+            memGenerated = genFn(mem, context)
             if memGenerated != None:
                 preDecls .append(memGenerated[0])
                 bodyDecls.append(memGenerated[1])
@@ -192,10 +189,10 @@ def render_type(ty:cx_ast.StructInfo):
     # Render CDO capture
     if ty.isAbstract:
         bodyDecls.append(f"//{ty.path} is abstract. Skipping class image capture.")
-    elif not detectImageCaptureStatus(ty):
+    elif not detectImageCaptureStatus(ty, context):
         bodyDecls.append(f"//Class image capture is disabled for {ty.path}")
     else:
-        backend = detectImageCaptureBackend(ty)
+        backend = detectImageCaptureBackend(ty, context)
         if backend in imageCaptureBackends.keys():
             bodyDecls.append(imageCaptureBackends[backend](ty))
         else:
@@ -215,7 +212,7 @@ def render_type(ty:cx_ast.StructInfo):
     )
 
 @MemRttiRenderer(cx_ast.ParentInfo)
-def render_parent(parent:cx_ast.ParentInfo):
+def render_parent(parent:cx_ast.ParentInfo, context:RttiGenerator):
     # Always render. We break it with C-style cast, which ignores visibility.
     virtualness = cx_ast.ParentInfo.Virtualness.VirtualExplicit if parent.explicitlyVirtual else cx_ast.ParentInfo.Virtualness.NonVirtual
     body = f"builder.addParent<{parent.owner.path}, {parent.parentTypePath}>({parent.visibility}, {virtualness});"
@@ -228,7 +225,7 @@ def makePubCastKey(obj:cx_ast.ASTNode):
     ])
 
 @MemRttiRenderer(cx_ast.FieldInfo)
-def render_field(field:cx_ast.FieldInfo):
+def render_field(field:cx_ast.FieldInfo, context:RttiGenerator):
     # Detect how to reference
     #if field.visibility != cx_ast.Member.Visibility.Public:
     pubCastKey = makePubCastKey(field)
@@ -244,7 +241,7 @@ def render_field(field:cx_ast.FieldInfo):
     return (preDecl, body)
 
 @MemRttiRenderer(cx_ast.ConstructorInfo)
-def render_constructor(ctor:cx_ast.ConstructorInfo):
+def render_constructor(ctor:cx_ast.ConstructorInfo, context:RttiGenerator):
     # Don't write template callables
     if _isTemplate(ctor): return None
 
@@ -263,7 +260,7 @@ def render_constructor(ctor:cx_ast.ConstructorInfo):
         return ("", f"//Skipping inaccessible constructor {ctor.path} {_idLoc(ctor, lower=True)}")
 
 @MemRttiRenderer(cx_ast.MemFuncInfo)
-def render_memFunc(func:cx_ast.MemFuncInfo):
+def render_memFunc(func:cx_ast.MemFuncInfo, context:RttiGenerator):
     # Don't write template callables
     if _isTemplate(func): return None
     
@@ -301,7 +298,7 @@ def render_memFunc(func:cx_ast.MemFuncInfo):
     return (preDecl, body)
 
 @MemRttiRenderer(cx_ast.StaticFuncInfo)
-def render_memStaticFunc(func:cx_ast.StaticFuncInfo):
+def render_memStaticFunc(func:cx_ast.StaticFuncInfo, context:RttiGenerator):
     # Don't write template callables
     if _isTemplate(func): return None
     
@@ -354,24 +351,24 @@ def searchAnnotations(node:cx_ast.ASTNode, selector, includeParents=True) -> cx_
 
 ########################## Annotation: CDO enable/backend ##########################
 
-def detectImageCaptureStatus(ty:cx_ast.StructInfo):
+def detectImageCaptureStatus(ty:cx_ast.StructInfo, context:RttiGenerator):
     prefix = "stix::do_image_capture"
     annot = searchAnnotations(ty, lambda a: a.text.startswith(prefix))
     if annot != None:
         status = annot.text[len(prefix)+1:]
-        if status == "default": status = RttiGenerator.defaultImageCaptureStatus
+        if status == "default": status = context.default_image_capture_status
     else:
-        status = RttiGenerator.defaultImageCaptureStatus
+        status = context.default_image_capture_status
     return evalAsBool(status)
 
-def detectImageCaptureBackend(ty:cx_ast.StructInfo):
+def detectImageCaptureBackend(ty:cx_ast.StructInfo, context:RttiGenerator):
     prefix = "stix::image_capture_backend"
     annot = searchAnnotations(ty, lambda a: a.text.startswith(prefix))
     if annot != None:
         backend = annot.text[len(prefix)+1:]
-        if backend == "default": backend = RttiGenerator.defaultImageCaptureBackend
+        if backend == "default": backend = context.default_image_capture_backend
     else:
-        backend = RttiGenerator.defaultImageCaptureBackend
+        backend = context.default_image_capture_backend
     return backend
 
 imageCaptureBackend_t = typing.Callable[[cx_ast.StructInfo], str]
@@ -426,6 +423,7 @@ if __name__ == "__main__":
     )
     RttiGenerator.argparser_add_defaults(parser)
     args = parser.parse_args(sys.argv[1:])
+    #print("Args:\n"+"\n".join(sys.argv[1:]))
 
     rttigen = RttiGenerator(args)
     rttigen.configure()
