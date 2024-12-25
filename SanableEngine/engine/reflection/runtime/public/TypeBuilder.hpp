@@ -8,7 +8,6 @@
 #include <functional>
 
 class ModuleTypeRegistry;
-class SyntheticTypeBuilder;
 
 class TypeBuilder
 {
