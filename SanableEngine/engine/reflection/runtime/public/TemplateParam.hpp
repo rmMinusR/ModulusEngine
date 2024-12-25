@@ -20,14 +20,10 @@ struct TypeTemplateParam
 
 #define _EXPAND(X) X
 #define _GET_VALUE(X) X::Value
-struct TemplateParam : public std::variant<_XM_FOREACH_TEMPLATE_PARAM_TYPE(_EXPAND)>
-{
-	struct Value : public std::variant<_XM_FOREACH_TEMPLATE_PARAM_TYPE(_GET_VALUE)>
-	{
-		STIX_API std::string getName() const;
-	};
+using TemplateParam = std::variant<_XM_FOREACH_TEMPLATE_PARAM_TYPE(_EXPAND)>;
+using TemplateParamValue = std::variant<_XM_FOREACH_TEMPLATE_PARAM_TYPE(_GET_VALUE)>;
 #undef _EXPAND
 #undef _GET_VALUE
 
-	STIX_API std::string getName() const;
-};
+STIX_API std::string getName(const TemplateParam&);
+STIX_API std::string getName(const TemplateParamValue&);

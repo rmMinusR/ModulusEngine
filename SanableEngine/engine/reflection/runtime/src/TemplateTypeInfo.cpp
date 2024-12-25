@@ -3,21 +3,33 @@
 #include <cassert>
 #include <sstream>
 
-#include "TypeInfo.hpp"
 #include "SyntheticTypeBuilder.hpp"
 
-TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParam::Value>& paramValues) const
+TemplateTypeInfo::TemplateTypeInfo(std::string name) :
+	name(name)
 {
+}
+
+TemplateTypeInfo::~TemplateTypeInfo()
+{
+}
+
+TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParamValue>& paramValues) const
+{
+	assert(paramValues.size() <= templateParams.size()); // Can't over-pass
+
+	// Assemble name
 	std::stringstream tmp;
-	tmp << name.as_str() << "<";
+	tmp << name << "<";
 	for (size_t i = 0; i < paramValues.size(); ++i)
 	{
 		if (i != 0) tmp << ", ";
-		tmp << paramValues[i].getName();
+		tmp << getName(paramValues[i]);
 	}
 	tmp << ">";
 	SyntheticTypeBuilder builder(tmp.str());
 
+	// Put fields
 	for (const auto& fi : fields)
 	{
 		TypeInfo const* type = nullptr;
@@ -31,7 +43,7 @@ TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParam::Value>& 
 		else if (auto const* paramName = std::get_if<std::string>(&fi.type))
 		{
 			// Lookup what index this parameter is
-			const auto it = std::find_if(templateParams.begin(), templateParams.end(), [=](const TemplateParam& p) { return p.getName() == *paramName; });
+			const auto it = std::find_if(templateParams.begin(), templateParams.end(), [=](const TemplateParam& p) { return std::get<TypeTemplateParam>(p).name == *paramName; });
 			assert(it != templateParams.end());
 			size_t paramIndex = it - templateParams.begin();
 
@@ -99,4 +111,28 @@ size_t TemplateTypeInfo::minSize() const
 		}
 	}
 	return std::max(size, (size_t)1);
+}
+
+const TypeTemplateParam& TemplateTypeInfo::addTypeParam(const std::string& name)
+{
+	return std::get<TypeTemplateParam>(
+		templateParams.emplace_back(TypeTemplateParam{ name })
+	);
+}
+
+const TypeTemplateParam& TemplateTypeInfo::addTypeParam(const std::string& name, const TypeInfo* defaultValue)
+{
+	return std::get<TypeTemplateParam>(
+		templateParams.emplace_back(TypeTemplateParam{ name, defaultValue })
+	);
+}
+
+void TemplateTypeInfo::addField(TypeName type, const std::string& name)
+{
+	fields.push_back({ type, name });
+}
+
+void TemplateTypeInfo::addField(TypeTemplateParam type, const std::string& name)
+{
+	fields.push_back({ type.name, name });
 }

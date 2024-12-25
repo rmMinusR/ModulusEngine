@@ -4,9 +4,9 @@
 
 #include "TypeInfo.hpp"
 
-std::string TemplateParam::getName() const
+std::string getName(const TemplateParam& param)
 {
-	if (const auto* concrete = std::get_if<TypeTemplateParam>(this))
+	if (const auto* concrete = std::get_if<TypeTemplateParam>(&param))
 	{
 		return concrete->name;
 	}
@@ -17,9 +17,9 @@ std::string TemplateParam::getName() const
 	}
 }
 
-std::string TemplateParam::Value::getName() const
+std::string getName(const TemplateParamValue& value)
 {
-	if (const auto* concrete = std::get_if<TypeTemplateParam::Value>(this))
+	if (const auto* concrete = std::get_if<TypeTemplateParam::Value>(&value))
 	{
 		return (*concrete)->name.as_str();
 	}
