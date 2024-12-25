@@ -13,7 +13,7 @@ struct MemberInfo //TODO rename: Callables are members, but don't appear in obje
 
 protected:
 	MemberInfo(size_t size, ptrdiff_t offset, const TypeName& owner);
-	ENGINE_RTTI_API void* getAddr(void* objInstance) const;
+	STIX_API void* getAddr(void* objInstance) const;
 };
 
 enum class MemberVisibility : uint8_t

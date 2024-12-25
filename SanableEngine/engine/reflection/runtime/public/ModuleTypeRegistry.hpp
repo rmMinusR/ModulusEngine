@@ -12,8 +12,8 @@ class GlobalTypeRegistry;
 class ModuleTypeRegistry
 {
 public:
-	ENGINE_RTTI_API TypeInfo const* lookupType(const TypeName& name) const;
-	ENGINE_RTTI_API const std::vector<TypeInfo>& getTypes() const;
+	STIX_API TypeInfo const* lookupType(const TypeName& name) const;
+	STIX_API const std::vector<TypeInfo>& getTypes() const;
 
 	/// <summary>
 	/// Attempt to find the exact type of a void pointer
@@ -22,15 +22,15 @@ public:
 	/// <param name="size">Size of object. Can be semi-inaccurate as long as we can safely read memory in the specified range.</param>
 	/// <param name="hint">Parent type, can be null if unknown</param>
 	/// <returns>Pointer to matching type, or null if none was found</returns>
-	ENGINE_RTTI_API TypeInfo const* snipeType(void* obj, size_t size, TypeInfo const* hint = nullptr) const;
+	STIX_API TypeInfo const* snipeType(void* obj, size_t size, TypeInfo const* hint = nullptr) const;
 
-	ENGINE_RTTI_API ModuleTypeRegistry();
-	ENGINE_RTTI_API ~ModuleTypeRegistry();
+	STIX_API ModuleTypeRegistry();
+	STIX_API ~ModuleTypeRegistry();
 
-	ENGINE_RTTI_API ModuleTypeRegistry(const ModuleTypeRegistry& cpy);
-	ENGINE_RTTI_API ModuleTypeRegistry(ModuleTypeRegistry&& mov);
-	ENGINE_RTTI_API ModuleTypeRegistry& operator=(const ModuleTypeRegistry& cpy);
-	ENGINE_RTTI_API ModuleTypeRegistry& operator=(ModuleTypeRegistry&& mov);
+	STIX_API ModuleTypeRegistry(const ModuleTypeRegistry& cpy);
+	STIX_API ModuleTypeRegistry(ModuleTypeRegistry&& mov);
+	STIX_API ModuleTypeRegistry& operator=(const ModuleTypeRegistry& cpy);
+	STIX_API ModuleTypeRegistry& operator=(ModuleTypeRegistry&& mov);
 	
 private:
 	std::vector<TypeInfo> types;

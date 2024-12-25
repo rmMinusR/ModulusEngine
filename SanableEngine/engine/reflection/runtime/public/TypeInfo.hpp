@@ -68,7 +68,7 @@ public:
 		/// <summary>
 		/// Look up a field by name. Returns nullptr if not found.
 		/// </summary>
-		ENGINE_RTTI_API const FieldInfo* getField(const std::string& name,
+		STIX_API const FieldInfo* getField(const std::string& name,
 												MemberVisibility visibilityFlags = MemberVisibility::Public,
 												bool includeInherited = true) const;
 
@@ -78,7 +78,7 @@ public:
 		/// <param name="visitor">Function to run on every FieldInfo</param>
 		/// <param name="visibilityFlags">What members/parents should be visible or ignored</param>
 		/// <param name="includeInherited">Include fields inherited from parents?</param>
-		ENGINE_RTTI_API void walkFields(std::function<void(const FieldInfo&)> visitor,
+		STIX_API void walkFields(std::function<void(const FieldInfo&)> visitor,
 										MemberVisibility visibilityFlags = MemberVisibility::Public,
 										bool includeInherited = true) const;
 
@@ -93,33 +93,33 @@ public:
 		/// <summary>
 		/// Visit every implicit constant in this type.
 		/// </summary>
-		ENGINE_RTTI_API void walkImplicits(std::function<void(const ImplicitInfo&)> visitor) const;
+		STIX_API void walkImplicits(std::function<void(const ImplicitInfo&)> visitor) const;
 
 		/// <summary>
 		/// Update vtable pointers on the given object instance.
 		/// </summary>
 		/// <param name="obj">Object to be updated</param>
-		ENGINE_RTTI_API void vptrJam(void* obj) const;
+		STIX_API void vptrJam(void* obj) const;
 
 		/// <summary>
 		/// Cast to a parent. Returns null if no parent found.
 		/// </summary>
 		/// <param name="obj">Object to cast</param>
-		ENGINE_RTTI_API void* upcast(void* obj, const TypeName& parentTypeName) const;
-		ENGINE_RTTI_API void* upcast(void* obj, const ParentInfo& parentType) const;
+		STIX_API void* upcast(void* obj, const TypeName& parentTypeName) const;
+		STIX_API void* upcast(void* obj, const ParentInfo& parentType) const;
 
 		/// <summary>
 		/// Check if this type inherits from the given type
 		/// </summary>
 		/// <param name="type">Type to check against</param>
 		/// <param name="grandparents">If false, don't check grandparents</param>
-		ENGINE_RTTI_API bool isDerivedFrom(const TypeName& type, bool grandparents = true) const;
+		STIX_API bool isDerivedFrom(const TypeName& type, bool grandparents = true) const;
 
 		/// <summary>
 		/// Test if the given object matches this type exactly. Does not test if object's type is derived from this.
 		/// Requires: captured ctor, virtual object
 		/// </summary>
-		ENGINE_RTTI_API bool matchesExact(void* obj) const;
+		STIX_API bool matchesExact(void* obj) const;
 
 		friend class TypeBuilder; //Only thing allowed to touch all member data.
 		friend struct TypeInfo;
@@ -163,42 +163,42 @@ public:
 		std::vector<ConstructorRecord> constructors;
 		std::optional<DestructorRecord> richDtor; //Detects implicit dtors using standard C++. If nullopt, destructor is deleted.
 
-		ENGINE_RTTI_API const stix::MemberFunction* getMemberFunction(const std::string& name, MemberVisibility visibility = MemberVisibility::Public) const;
-		ENGINE_RTTI_API const stix::MemberFunction* getMemberFunction(const std::string& name, const std::vector<TypeName>& paramTypes, MemberVisibility visibility = MemberVisibility::Public) const;
-		ENGINE_RTTI_API const stix::StaticFunction* getStaticFunction(const std::string& name, MemberVisibility visibility = MemberVisibility::Public) const;
-		ENGINE_RTTI_API const stix::StaticFunction* getStaticFunction(const std::string& name, const std::vector<TypeName>& paramTypes, MemberVisibility visibility = MemberVisibility::Public) const;
+		STIX_API const stix::MemberFunction* getMemberFunction(const std::string& name, MemberVisibility visibility = MemberVisibility::Public) const;
+		STIX_API const stix::MemberFunction* getMemberFunction(const std::string& name, const std::vector<TypeName>& paramTypes, MemberVisibility visibility = MemberVisibility::Public) const;
+		STIX_API const stix::StaticFunction* getStaticFunction(const std::string& name, MemberVisibility visibility = MemberVisibility::Public) const;
+		STIX_API const stix::StaticFunction* getStaticFunction(const std::string& name, const std::vector<TypeName>& paramTypes, MemberVisibility visibility = MemberVisibility::Public) const;
 
 	} capabilities;
 
 public:
-	ENGINE_RTTI_API TypeInfo();
-	ENGINE_RTTI_API ~TypeInfo();
+	STIX_API TypeInfo();
+	STIX_API ~TypeInfo();
 
-	ENGINE_RTTI_API TypeInfo(const TypeInfo& cpy);
-	ENGINE_RTTI_API TypeInfo(TypeInfo&& mov);
-	ENGINE_RTTI_API TypeInfo& operator=(const TypeInfo& cpy);
-	ENGINE_RTTI_API TypeInfo& operator=(TypeInfo&& mov);
+	STIX_API TypeInfo(const TypeInfo& cpy);
+	STIX_API TypeInfo(TypeInfo&& mov);
+	STIX_API TypeInfo& operator=(const TypeInfo& cpy);
+	STIX_API TypeInfo& operator=(TypeInfo&& mov);
 
 	/// <summary>
 	/// Check if this type has data (ie. hasn't been empty-constructed).
 	/// Does NOT indicate whether using instances will cause errors.
 	/// </summary>
 	/// <returns></returns>
-	ENGINE_RTTI_API bool isValid() const;
+	STIX_API bool isValid() const;
 
-	ENGINE_RTTI_API bool isDummy() const;
+	STIX_API bool isDummy() const;
 
 	/// <summary>
 	/// Check if this type is currently loaded.
 	/// If so, instances can be used without causing errors.
 	/// </summary>
-	ENGINE_RTTI_API bool isLoaded() const;
+	STIX_API bool isLoaded() const;
 
 	/// <summary>
 	/// Update from live copy in GlobalTypeRegistry, if one is present.
 	/// </summary>
 	/// <returns>Whether a live copy was present</returns>
-	ENGINE_RTTI_API bool tryRefresh();
+	STIX_API bool tryRefresh();
 
 	/// <summary>
 	/// Look up a parent by name
@@ -207,7 +207,7 @@ public:
 	/// <param name="visibilityFlags">What parents should be visible or ignored</param>
 	/// <param name="includeInherited">If true, recurse into parents</param>
 	/// <param name="makeComplete">If true, and also includeInherited, grandparent ParentInfos will be adjusted to be valid for this type</param>
-	ENGINE_RTTI_API std::optional<ParentInfo> getParent(const TypeName& name,
+	STIX_API std::optional<ParentInfo> getParent(const TypeName& name,
 											MemberVisibility visibilityFlags = MemberVisibility::Public,
 											bool includeInherited = true,
 											bool makeComplete = true) const;
@@ -215,13 +215,13 @@ public:
 	/// <summary>
 	/// INTERNAL USE ONLY. Currently used to finalize byteUsage, since we need to be able to look up our parents' fields.
 	/// </summary>
-	ENGINE_RTTI_INTERNAL( void doLateBinding(ModuleTypeRegistry* ownModule); )
+	STIX_INTERNAL( void doLateBinding(ModuleTypeRegistry* ownModule); )
 
 private:
 	/// <summary>
 	/// INTERNAL USE ONLY. Currently used to set up byte usage mask.
 	/// </summary>
-	ENGINE_RTTI_API void create_internalFinalize();
+	STIX_API void create_internalFinalize();
 
 public:
 	/// <summary>
