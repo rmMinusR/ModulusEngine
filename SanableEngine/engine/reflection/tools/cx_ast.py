@@ -279,7 +279,9 @@ class Module:
         try: this.byType[type(node)].remove(node)
         except ValueError: pass
         
-        if node.owner != None: node.owner.children.remove(node)
+        if node.owner != None:
+            try: node.owner.children.remove(node)
+            except ValueError: pass
 
     def linkAll(this):
         this.__linked = True
