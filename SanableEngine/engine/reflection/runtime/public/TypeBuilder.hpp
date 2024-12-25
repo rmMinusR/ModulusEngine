@@ -18,12 +18,12 @@ private:
 	std::vector<ParentInfoBuilder> pendingParents;
 	std::vector<FieldInfoBuilder> pendingFields;
 	
-	ENGINE_RTTI_API TypeBuilder();
-	
-	ENGINE_RTTI_API void addParent_internal(const TypeName& parent, size_t parentSize, const std::function<void*(void*)>& upcastFn, MemberVisibility visibility, ParentInfo::Virtualness virtualness); //Order independent. UpcastFn must be valid when captureCDO or registerType are called.
-	ENGINE_RTTI_API void addField_internal(const TypeName& declaredType, const std::string& name, size_t size, std::function<ptrdiff_t(const void*)> accessor, MemberVisibility visibility); //Order independent. Accessor must be valid after captureCDO is called.
-	ENGINE_RTTI_API void captureClassImage_v1_internal(std::function<void(void*)> ctor, std::function<void(void*)> dtor);
-	ENGINE_RTTI_API void captureClassImage_v2_internal(const DetectedConstants& image);
+	STIX_API TypeBuilder();
+
+	STIX_API void addParent_internal(const TypeName& parent, size_t parentSize, const std::function<void*(void*)>& upcastFn, MemberVisibility visibility, ParentInfo::Virtualness virtualness); //Order independent. UpcastFn must be valid when captureCDO or registerType are called.
+	STIX_API void addField_internal(const TypeName& declaredType, const std::string& name, size_t size, std::function<ptrdiff_t(const void*)> accessor, MemberVisibility visibility); //Order independent. Accessor must be valid after captureCDO is called.
+	STIX_API void captureClassImage_v1_internal(std::function<void(void*)> ctor, std::function<void(void*)> dtor);
+	STIX_API void captureClassImage_v2_internal(const DetectedConstants& image);
 
 public:
 	template<typename TObj>
@@ -34,7 +34,7 @@ public:
 		return out;
 	}
 
-	ENGINE_RTTI_API void registerType(ModuleTypeRegistry* registry);
+	STIX_API void registerType(ModuleTypeRegistry* registry);
 
 	//Order independent
 	//Ok to use for virtual inheritance
@@ -64,9 +64,9 @@ public:
 		addField_internal(TypeName::create<TField>(), name, sizeof(TField), accessor, MemberVisibility::Public); // TODO extract visibility in RTTI generation step
 	}
 
-	ENGINE_RTTI_API void addMemberFunction(const stix::MemberFunction& func, const std::string& name, MemberVisibility visibility, bool isVirtual); //Order independent
-	ENGINE_RTTI_API void addStaticFunction(const stix::StaticFunction& func, const std::string& name, MemberVisibility visibility); //Order independent
-	ENGINE_RTTI_API void addConstructor   (const stix::StaticFunction& thunk, MemberVisibility visibility); //Order independent
+	STIX_API void addMemberFunction(const stix::MemberFunction& func, const std::string& name, MemberVisibility visibility, bool isVirtual); //Order independent
+	STIX_API void addStaticFunction(const stix::StaticFunction& func, const std::string& name, MemberVisibility visibility); //Order independent
+	STIX_API void addConstructor   (const stix::StaticFunction& thunk, MemberVisibility visibility); //Order independent
 
 	//Only call once all fields and parents are registered
 	template<typename TObj, typename... TCtorArgs>

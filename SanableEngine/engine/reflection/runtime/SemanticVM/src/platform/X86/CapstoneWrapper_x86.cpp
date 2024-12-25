@@ -18,15 +18,32 @@ void_func_ptr platform_getRelFunc(const cs_insn& insn)
 bool platform_isIf(const cs_insn& insn)
 {
 	return !insn_in_group(insn, cs_group_type::CS_GRP_CALL)
-		&& (insn_in_group(insn, cs_group_type::CS_GRP_BRANCH_RELATIVE) || (
-				insn_in_group(insn, cs_group_type::CS_GRP_JUMP) && insn.id != X86_INS_JMP //Unconditional JMP isn't a branchable
-			)
+		&& insn.id != X86_INS_JMP //Unconditional JMP isn't a branchable
+		&& (
+			insn_in_group(insn, cs_group_type::CS_GRP_BRANCH_RELATIVE)
+			|| insn_in_group(insn, cs_group_type::CS_GRP_JUMP)
 		);
 }
 
 bool platform_isInterrupt(const cs_insn& insn)
 {
 	return insn.id == x86_insn::X86_INS_INT3 || insn.id == x86_insn::X86_INS_INT || insn.id == x86_insn::X86_INS_INTO || insn.id == x86_insn::X86_INS_INT1;
+}
+
+void* platform_getJumpTarget(const cs_insn& insn)
+{
+	if (insn.id == x86_insn::X86_INS_LEA || insn_in_group(insn, x86_insn_group::X86_GRP_BRANCH_RELATIVE))
+	{
+		return platform_getRelAddr(insn);
+	}
+	else if (insn.detail->x86.operands[0].type == x86_op_type::X86_OP_IMM) // CALL, JMP, JCC
+	{
+		return (void*)insn.detail->x86.operands[0].imm;
+	}
+	else
+	{
+		return nullptr;
+	}
 }
 
 void* unwrapAliaFunction(void(*fn)())

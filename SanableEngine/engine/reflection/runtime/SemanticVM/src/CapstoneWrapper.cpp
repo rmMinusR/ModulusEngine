@@ -86,8 +86,17 @@ void foreachSubFunction(void(*fn)(), const std::function<void( void(*)() )>& vis
 		}
 		else if (carray_contains(insn->detail->groups, insn->detail->groups_count, cs_group_type::CS_GRP_BRANCH_RELATIVE))
 		{
-			assert(false && "Cannot determine subfunction: caller is non-linear");
-			break;
+			const void* branchTarget = nullptr;
+			if (!platform_isIf(*insn) && (branchTarget = platform_getJumpTarget(*insn)) && branchTarget >= cursor)
+			{
+				cursor = (const uint8_t*)branchTarget;
+				addr = (uint_addr_t)branchTarget;
+			}
+			else
+			{
+				assert(false && "Cannot determine subfunction: caller is non-linear");
+				break;
+			}
 		}
 		else if (carray_contains(insn->detail->groups, insn->detail->groups_count, cs_group_type::CS_GRP_RET))
 		{
@@ -112,14 +121,16 @@ void* getSubFunction(void(*fn)(), int index)
 	return out;
 }
 
-void* getLastSubFunction(void(*fn)())
+void* getLastSubFunction(void(*fn)(), size_t index)
 {
-	void* out = nullptr;
+	void* out[index+1];
+	memset(out, 0, (index+1)*sizeof(void*));
 	foreachSubFunction(fn,
 		[&](void(*i)())
 		{
-			out = (void*)i;
+			for(int i = 0; i < index; ++i) out[i] = out[i+1];
+			out[index] = (void*)i;
 		}
 	);
-	return out;
+	return out[0];
 }

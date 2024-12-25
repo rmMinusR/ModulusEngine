@@ -10,6 +10,7 @@
 
 struct TypeInfo;
 class SyntheticTypeBuilder;
+class ModuleTypeRegistry;
 
 namespace stix::detail
 {
@@ -39,10 +40,10 @@ private:
 		Synthetic = 1<<1
 	} flags;
 	static const char* incomplete_ref_literal;
-	ENGINE_RTTI_API TypeName(const std::string& name, Flags flags);
+	STIX_API TypeName(const std::string& name, Flags flags);
 public:
-	ENGINE_RTTI_API TypeName();
-	ENGINE_RTTI_API static TypeName incomplete_ref();
+	STIX_API TypeName();
+	STIX_API static TypeName incomplete_ref();
 
 	template<typename TRaw>
 	static TypeName create()
@@ -53,7 +54,7 @@ public:
 	template<typename... TPack>
 	static std::vector<TypeName> createPack() { return { create<TPack>()... }; }
 
-	ENGINE_RTTI_API static TypeName createSynthetic(const std::string& name);
+	STIX_API static TypeName createSynthetic(const std::string& name);
 
 	template<typename T>
 	static TypeName tryCreate()
@@ -66,24 +67,24 @@ public:
 	template<typename... TPack>
 	static std::vector<TypeName> tryCreatePack() { return { tryCreate<TPack>()... }; }
 
-	ENGINE_RTTI_API std::optional<TypeName> cvUnwrap() const;
-	ENGINE_RTTI_API std::optional<TypeName> dereference() const;
-	ENGINE_RTTI_API bool isSynthetic() const;
+	STIX_API std::optional<TypeName> cvUnwrap() const;
+	STIX_API std::optional<TypeName> dereference() const;
+	STIX_API bool isSynthetic() const;
 
-	ENGINE_RTTI_API bool isValid() const; //Whether the name has a valid value. Does NOT indicate whether there is live type data backing it.
-	ENGINE_RTTI_API TypeInfo const* resolve() const;
+	STIX_API bool isValid() const; //Whether the name has a valid value. Does NOT indicate whether there is live type data backing it.
+	STIX_API TypeInfo const* resolve(ModuleTypeRegistry* moduleHint = nullptr) const;
 
-	ENGINE_RTTI_API bool operator==(const TypeName& other) const;
-	ENGINE_RTTI_API bool operator!=(const TypeName& other) const;
+	STIX_API bool operator==(const TypeName& other) const;
+	STIX_API bool operator!=(const TypeName& other) const;
 
-	ENGINE_RTTI_API const std::string& as_str() const;
-	ENGINE_RTTI_API char const* c_str() const;
+	STIX_API const std::string& as_str() const;
+	STIX_API char const* c_str() const;
 
-	ENGINE_RTTI_API TypeName(const TypeName& cpy) = default;
-	ENGINE_RTTI_API TypeName(TypeName&& mov) = default;
-	ENGINE_RTTI_API TypeName& operator=(const TypeName& cpy) = default;
-	ENGINE_RTTI_API TypeName& operator=(TypeName&& mov) = default;
-	ENGINE_RTTI_API ~TypeName() = default;
+	STIX_API TypeName(const TypeName& cpy) = default;
+	STIX_API TypeName(TypeName&& mov) = default;
+	STIX_API TypeName& operator=(const TypeName& cpy) = default;
+	STIX_API TypeName& operator=(TypeName&& mov) = default;
+	STIX_API ~TypeName() = default;
 
 
 	#pragma region Advanced template utils
@@ -143,7 +144,7 @@ namespace stix::detail
 template <>
 struct std::hash<TypeName>
 {
-	ENGINE_RTTI_API std::size_t operator()(const TypeName& k) const
+	STIX_API std::size_t operator()(const TypeName& k) const
 	{
 		return k.nameHash;
 	}

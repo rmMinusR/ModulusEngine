@@ -32,6 +32,7 @@ void TypeInfoView::refresh()
 				255
 			};
 
+			// Background image(s)
 			size_t cursor = f.offset;
 			size_t end = f.offset+f.size;
 			size_t nLines = 0;
@@ -101,6 +102,7 @@ void TypeInfoView::refresh()
 			if (imp.data)
 			{
 				std::stringstream tmp;
+				tmp << "[vptr: 0x";
 				
 				const char* hexLut = "0123456789abcdef";
 				if (isLittleEndian)
@@ -122,6 +124,7 @@ void TypeInfoView::refresh()
 					}
 				}
 
+				tmp << "]";
 				lbl->setText(tmp.str());
 			}
 			else

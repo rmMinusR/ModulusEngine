@@ -7,6 +7,7 @@
 #include <locale>
 #include <cassert>
 #include <variant>
+#include <ReflectionSpec.hpp>
 
 #include "dllapi.h"
 
@@ -16,7 +17,7 @@ enum class SerialFormat
 	YAML
 };
 
-class SerialNode
+class STIX_DISABLE_IMAGE_CAPTURE SerialNode
 {
 protected:
 	SerialNode() = default;

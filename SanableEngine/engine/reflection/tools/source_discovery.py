@@ -46,31 +46,40 @@ class SourceFile:
 			this.includes_literal = [i.strip()[len("#include <"):-1] for i in this.contents.split("\n") if i.strip().startswith("#include ")]
 			if this.project != None:
 				this.includes_literal = [(_real if _real != None else _lit) for _real,_lit in [(project.resolveInclude(i, this.path),i) for i in this.includes_literal] ]
+			this.includes_literal = [i.replace(os.altsep, os.sep) for i in this.includes_literal] # Normalize path separators
+			this.includes_literal = [i for i in this.includes_literal if not i.endswith(os.sep) and i.split(os.sep)[-1] != "."] # No directories
 		
 	@cached_property
 	def includes(this):
-		return [
-			i for i in [
-				next(filter(lambda f: f.path==i, this.project.files), None)
-				for i in this.includes_literal
-			]
-			if i != None
-		]
+		out = []
+		for i in this.includes_literal:
+			abspath = os.path.abspath(i)
+
+			# Try to find existing from initial pass
+			sf = next(filter(lambda f: f.abspath==abspath, this.project.files), None)
+			
+			# Fallback: externals
+			if sf == None and os.path.exists(abspath):
+				# Omit system libraries, assume they don't change
+				sf = SourceFile(i, this.project)
+
+			if sf != None: out.append(sf)
+		return out
 
 	def __repr__(this):
 		return this.path
 
 	def __eq__(this, other):
-		return isinstance(other, SourceFile) and this.path == other.path
+		return isinstance(other, SourceFile) and this.abspath == other.abspath
 
 	def __hash__(this):
 		return hash(this.path)
 
 	def __getstate__(this):
-		return (this.path, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal)
+		return (this.path, this.abspath, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal)
 
 	def __setstate__(this, d):
-		(this.path, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal) = d
+		(this.path, this.abspath, this.isGenerated, this.type, this.hasError, this.contentsHash, this.includes_literal) = d
 		this.tu = None
 		this.project = None # Must be rebound elsewhere!
 
@@ -115,6 +124,23 @@ class Project:
 		for p in this.srcRoots: this.files += glob.glob(p+"/**", recursive=True)
 		this.files = [SourceFile(i, this) for i in sorted(set(this.files)) if not os.path.isdir(i)]
 		this.files = [i for i in this.files if i.type != None] # Ignore non-C++ files
+		
+		# Only referenced includes, not everything in includeDirs
+		this.externalIncludes = None
+		externalIncludes = []
+		def _traverse(file:SourceFile):
+			for i in file.includes:
+				if i not in externalIncludes:
+					externalIncludes.append(i)
+					_traverse(i)
+		for i in this.files: _traverse(i)
+		externalIncludes = [i for i in externalIncludes if i not in this.files]
+		this.externalIncludes = externalIncludes
+
+		#externalIncludes = []
+		#for i in this.files: externalIncludes.extend(i.includes)
+		#externalIncludes = [i for i in externalIncludes if i not in this.files]
+		#this.externalIncludes = externalIncludes
 
 	def __getstate__(this):
 		return (this.files, this.srcRoots, this.includeDirs, this.additionalCompilerOptions)
@@ -141,21 +167,32 @@ class Project:
 		# Failed to locate
 		return None
 
+	def getFile(this, path:str) -> SourceFile|None:
+		abspath = os.path.abspath(path)
+		for i in this.files:
+			if i.abspath == abspath:
+				return i
+		for i in this.externalIncludes:
+			if i.abspath == abspath:
+				return i
+		return None
+
 class ProjectDiff:
 	def __init__(this, oldProj: Project|None, newProj: Project):
-		lookupMatchingFile = lambda file, _list: next(filter(lambda i: i.path == file.path, _list), None)
+		lookupMatchingFile = lambda file, _list: next((i for i in _list if i.abspath == file.abspath), None)
 		
 		def isUpToDate(file: SourceFile):
 			if oldProj == None: return False
 			oldMatch:SourceFile = lookupMatchingFile(file, oldProj.files)
 			newMatch:SourceFile = lookupMatchingFile(file, newProj.files)
+			if oldMatch == None and newMatch == None: return True # External dependency: assume unchanged - TODO is this bad?
 			if oldMatch.contentsHash != newMatch.contentsHash: return False
 			if oldMatch.includes != newMatch.includes: return False
 
 			return all((isUpToDate(i) for i in oldMatch.includes))
 			
-		existedPreviously = lambda file: any((i.path == file.path for i in oldProj.files)) if oldProj!=None else False
-		existsCurrently   = lambda file: any((i.path == file.path for i in newProj.files))
+		existedPreviously = lambda file: any((i.abspath == file.abspath for i in oldProj.files)) if oldProj!=None else False
+		existsCurrently   = lambda file: any((i.abspath == file.abspath for i in newProj.files))
 		
 		this.upToDate = [i for i in newProj.files if existedPreviously(i) and isUpToDate(i)]
 		this.outdated = [i for i in newProj.files if existedPreviously(i) and not isUpToDate(i)]
