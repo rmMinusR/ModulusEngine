@@ -13,7 +13,7 @@
 class GlobalTypeRegistry
 {
 public:
-	typedef std::wstring module_key_t;
+	typedef std::wstring_view module_key_t;
 
 	class Snapshot
 	{
@@ -53,6 +53,9 @@ public:
 	/// </summary>
 	STIX_API static void loadModule(std::string key, const ModuleTypeRegistry& newTypes);
 	STIX_API static void loadModule(module_key_t key, const ModuleTypeRegistry& newTypes);
+
+	STIX_API static void loadIntrinsics();
+	STIX_API static std::wstring_view INTRINSICS_MODULE_ID;
 
 	/// <summary>
 	/// Mark a module as unloaded

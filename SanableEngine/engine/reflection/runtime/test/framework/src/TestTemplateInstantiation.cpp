@@ -9,6 +9,7 @@ TEST_CASE("Template instantiation")
 	//Prepare clean state
 	{
 		GlobalTypeRegistry::clear();
+		GlobalTypeRegistry::loadIntrinsics();
 		ModuleTypeRegistry m;
 		plugin_reportTypes(&m);
 		GlobalTypeRegistry::loadModule("test runner", m);
@@ -72,13 +73,13 @@ TEST_CASE("Template instantiation")
 		ty.addField(T, "t2");
 
 		// Check template validity
-		CHECK(ty.minSize() == sizeof(int)*2 + 2);
+		CHECK(ty.minSize() == sizeof(int)*3 + 1); // int, T, padding, int, T
 		CHECK(ty.minAlign() == alignof(int));
 
 		// Instantiate template and check instance validity
 		TypeInfo t = ty.instantiate({ TypeName::create<char>().resolve() });
 		CHECK(t.name.as_str() == "Foo<char>");
-		CHECK(t.layout.size == sizeof(int)*2 + sizeof(char));
+		CHECK(t.layout.size == sizeof(int)*3 + sizeof(char)); // int, char, padding, int, char
 		CHECK(t.layout.align == std::max(alignof(int), alignof(char)));
 	}
 

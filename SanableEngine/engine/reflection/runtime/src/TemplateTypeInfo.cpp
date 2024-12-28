@@ -101,14 +101,18 @@ size_t TemplateTypeInfo::minSize() const
 			if (concreteFullType)
 			{
 				size_t align = concreteFullType->layout.align;
-				if (size % align != 0)
+				if (size & (align-1))
 				{
-					// Not aligned: round up
-					size = size - (size % align) + align;
+					// Fixup alignment
+					// Assumes power of two
+					size = size & ~(align-1);
+					size += align;
 				}
 				size += concreteFullType->layout.size;
 			}
+			else size++; // Unloaded/incomplete type: must be at least one byte
 		}
+		else size++; // Template type: must be at least one byte
 	}
 	return std::max(size, (size_t)1);
 }

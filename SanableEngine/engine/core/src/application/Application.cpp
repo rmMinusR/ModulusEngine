@@ -85,6 +85,8 @@ void Application::init(Game* game, const GLSettings& glSettings, WindowBuilder& 
     system->Init(this);
 
     //Prepare RTTI
+    GlobalTypeRegistry::clear();
+    GlobalTypeRegistry::loadIntrinsics();
     {
         ModuleTypeRegistry m;
         engine_reportTypes(&m);

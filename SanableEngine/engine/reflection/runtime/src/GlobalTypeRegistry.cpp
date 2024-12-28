@@ -4,6 +4,8 @@
 #include <cassert>
 #include <stdlib.h>
 
+#include "TypeBuilder.hpp"
+
 std::unordered_map<GlobalTypeRegistry::module_key_t, ModuleTypeRegistry> GlobalTypeRegistry::modules;
 std::optional<GlobalTypeRegistry::Snapshot> GlobalTypeRegistry::_cachedSnapshotValue;
 
@@ -19,7 +21,8 @@ TypeInfo const* GlobalTypeRegistry::lookupType(const TypeName& name)
 
 ModuleTypeRegistry const* GlobalTypeRegistry::getModule(const module_key_t& key)
 {
-	return &modules.at(key);
+	auto it = modules.find(key);
+	return it != modules.end() ? &it->second : nullptr;
 }
 
 void GlobalTypeRegistry::loadModule(std::string key, const ModuleTypeRegistry& newTypes)
@@ -41,6 +44,54 @@ void GlobalTypeRegistry::loadModule(module_key_t key, const ModuleTypeRegistry& 
 	
 	//Finalize late-binding info
 	it->second.doLateBinding();
+}
+
+std::wstring_view GlobalTypeRegistry::INTRINSICS_MODULE_ID = L"<C++ intrinsics>";
+
+void GlobalTypeRegistry::loadIntrinsics()
+{
+	assert(getModule(INTRINSICS_MODULE_ID) == nullptr);
+
+	ModuleTypeRegistry intrinsics;
+
+#define DECL_INTRINSIC(ty) TypeBuilder::create<ty>().registerType(&intrinsics)
+
+	// Character types
+
+	DECL_INTRINSIC(char);
+	DECL_INTRINSIC(wchar_t);
+
+	// Integral types
+
+	DECL_INTRINSIC(  signed char);
+	DECL_INTRINSIC(unsigned char);
+
+	DECL_INTRINSIC(   short int);
+	DECL_INTRINSIC(unsigned short int);
+
+	DECL_INTRINSIC(         int);
+	DECL_INTRINSIC(unsigned int);
+	
+	DECL_INTRINSIC(         long int);
+	DECL_INTRINSIC(unsigned long int);
+
+	DECL_INTRINSIC(         long long int);
+	DECL_INTRINSIC(unsigned long long int);
+
+	// Decimal types
+
+	DECL_INTRINSIC(float);
+	DECL_INTRINSIC(double);
+	DECL_INTRINSIC(long double);
+
+	// Misc
+
+	DECL_INTRINSIC(bool);
+	DECL_INTRINSIC(decltype(nullptr));
+
+#undef DECL_INTRINSIC
+
+	loadModule(INTRINSICS_MODULE_ID, intrinsics);
 }
 
 TypeInfo const* GlobalTypeRegistry::snipeType(void* obj, size_t size, TypeInfo const* hint)

@@ -2,7 +2,8 @@
 
 #include "ModuleTypeRegistry.hpp"
 
-SyntheticTypeBuilder::SyntheticTypeBuilder(const std::string& name)
+SyntheticTypeBuilder::SyntheticTypeBuilder(const std::string& name) :
+	cursor(0)
 {
 	type.name = TypeName::createSynthetic(name);
 }
