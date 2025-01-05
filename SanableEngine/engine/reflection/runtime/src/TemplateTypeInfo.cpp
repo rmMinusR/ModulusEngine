@@ -14,6 +14,38 @@ TemplateTypeInfo::~TemplateTypeInfo()
 {
 }
 
+TypeInfo const* TemplateTypeInfo::resolveType(const PossiblyTemplatedType& ty, const std::vector<TemplateParamValue>& paramValues) const
+{
+	TypeInfo const* out = nullptr;
+
+	if (auto const* concrete = std::get_if<TypeName>(&ty))
+	{
+		// Known constant type: just resolve
+		out = concrete->resolve();
+		assert(out && "Type specified but not could not resolve");
+	}
+	else if (auto const* paramIndex = std::get_if<size_t>(&ty))
+	{
+		if (*paramIndex < paramValues.size())
+		{
+			// Explicit param passed, use it
+			out = std::get<TypeTemplateParam::Value>(paramValues[*paramIndex]);
+		}
+		else
+		{
+			// No explicit param passed, use default param
+			out = std::get<TypeTemplateParam>(templateParams[*paramIndex]).defaultValue;
+			assert(out && "Template parameter lacks default value, and none was provided");
+		}
+	}
+	else
+	{
+		assert(false && "Unhandled template param type");
+	}
+
+	return out;
+}
+
 TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParamValue>& paramValues) const
 {
 	assert(paramValues.size() <= templateParams.size()); // Can't over-pass
@@ -29,42 +61,16 @@ TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParamValue>& pa
 	tmp << ">";
 	SyntheticTypeBuilder builder(tmp.str());
 
+	// Put parents
+	for (const auto& p : parents)
+	{
+		builder.addParent(*resolveType(p.type, paramValues), p.visibility, ParentInfo::Virtualness::NonVirtual);
+	}
+
 	// Put fields
 	for (const auto& fi : fields)
 	{
-		TypeInfo const* type = nullptr;
-
-		if (auto const* concrete = std::get_if<TypeName>(&fi.type))
-		{
-			// Known constant type: just resolve
-			type = concrete->resolve();
-			assert(type && "Type specified but not could not resolve");
-		}
-		else if (auto const* paramName = std::get_if<std::string>(&fi.type))
-		{
-			// Lookup what index this parameter is
-			const auto it = std::find_if(templateParams.begin(), templateParams.end(), [=](const TemplateParam& p) { return std::get<TypeTemplateParam>(p).name == *paramName; });
-			assert(it != templateParams.end());
-			size_t paramIndex = it - templateParams.begin();
-
-			if (paramIndex < paramValues.size())
-			{
-				// Explicit param passed, use it
-				type = std::get<TypeTemplateParam::Value>(paramValues[paramIndex]);
-			}
-			else
-			{
-				// No explicit param passed, use default param
-				type = std::get<TypeTemplateParam>(templateParams[paramIndex]).defaultValue;
-				assert(type && "Template parameter lacks default value, and none was provided");
-			}
-		}
-		else
-		{
-			assert(false && "Unhandled template param type");
-		}
-
-		builder.addField(*type, fi.name);
+		builder.addField(*resolveType(fi.type, paramValues), fi.name);
 	}
 
 	return builder.finalize();
@@ -131,12 +137,32 @@ const TypeTemplateParam& TemplateTypeInfo::addTypeParam(const std::string& name,
 	);
 }
 
-void TemplateTypeInfo::addField(TypeName type, const std::string& name)
+void TemplateTypeInfo::addField(TypeName knownType, const std::string& name)
 {
-	fields.push_back({ type, name });
+	fields.push_back(Field{ knownType, name });
 }
 
 void TemplateTypeInfo::addField(TypeTemplateParam type, const std::string& name)
 {
-	fields.push_back({ type.name, name });
+	// Lookup what index this parameter is
+	const auto it = std::find_if(templateParams.begin(), templateParams.end(), [=](const TemplateParam& p) { return std::get<TypeTemplateParam>(p).name == type.name; });
+	assert(it != templateParams.end());
+	size_t paramIndex = it - templateParams.begin();
+
+	fields.push_back(Field{ paramIndex, name });
+}
+
+void TemplateTypeInfo::addParent(TypeName knownType, MemberVisibility visibility)
+{
+	parents.push_back(Parent{ knownType, visibility });
+}
+
+void TemplateTypeInfo::addParent(TypeTemplateParam type, MemberVisibility visibility)
+{
+	// Lookup what index this parameter is
+	const auto it = std::find_if(templateParams.begin(), templateParams.end(), [=](const TemplateParam& p) { return std::get<TypeTemplateParam>(p).name == type.name; });
+	assert(it != templateParams.end());
+	size_t paramIndex = it - templateParams.begin();
+
+	parents.push_back(Parent{ paramIndex, visibility });
 }

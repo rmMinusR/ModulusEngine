@@ -28,6 +28,17 @@ void SyntheticTypeBuilder::addField_internal(const TypeName& fieldType, const st
 	type.layout.align = std::max(type.layout.align, align);
 }
 
+void SyntheticTypeBuilder::addParent_internal(const TypeName& parent, size_t parentSize, size_t parentAlign, MemberVisibility visibility, ParentInfo::Virtualness virtualness)
+{
+	assert(type.layout.fields.empty() && "Standard layout requires parents to be before fields");
+	assert(virtualness == ParentInfo::Virtualness::NonVirtual && "Virtual inheritance not currently supported by synthetics");
+
+	size_t loc = nextAtAlign(parentAlign);
+	type.layout.parents.push_back(ParentInfo(parentSize, loc, type.name, parent, visibility, virtualness));
+	type.layout.size = cursor = loc + parentSize;
+	type.layout.align = std::max(type.layout.align, parentAlign);
+}
+
 TypeInfo SyntheticTypeBuilder::finalize()
 {
 	return type;

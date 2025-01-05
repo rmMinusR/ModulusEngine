@@ -27,17 +27,29 @@ public:
 
 	// Fields
 
-	STIX_API void addField(TypeName type, const std::string& name);
+	STIX_API void addField(TypeName knownType, const std::string& name);
 	STIX_API void addField(TypeTemplateParam type, const std::string& name);
+	STIX_API void addParent(TypeName knownType, MemberVisibility visibility = MemberVisibility::Public); // Virtual inheritance currently not supported
+	STIX_API void addParent(TypeTemplateParam type, MemberVisibility visibility = MemberVisibility::Public);
 
 private:
+	using PossiblyTemplatedType = std::variant<TypeName, size_t>; // 2nd is template param index
+	TypeInfo const* resolveType(const PossiblyTemplatedType& ty, const std::vector<TemplateParamValue>& paramValues) const;
+
+	struct Parent
+	{
+		PossiblyTemplatedType type;
+		MemberVisibility visibility = MemberVisibility::Public;
+	};
+
 	struct Field
 	{
-		std::variant<TypeName, std::string> type; // 2nd is template param name
+		PossiblyTemplatedType type;
 		std::string name;
 	};
 
 	std::string name;
 	std::vector<TemplateParam> templateParams;
+	std::vector<Parent> parents;
 	std::vector<Field> fields;
 };
