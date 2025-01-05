@@ -79,6 +79,22 @@ TypeInfo TemplateTypeInfo::instantiate(const std::vector<TemplateParamValue>& pa
 size_t TemplateTypeInfo::minAlign() const
 {
 	size_t align = 1;
+
+	// Walk parents
+	for (const auto& p : parents)
+	{
+		if (TypeName const* concrete = std::get_if<TypeName>(&p.type))
+		{
+			TypeInfo const* concreteFullType = concrete->resolve();
+			assert(concreteFullType);
+			if (concreteFullType)
+			{
+				align = std::max(align, concreteFullType->layout.align);
+			}
+		}
+	}
+
+	// Walk fields
 	for (const auto& fi : fields)
 	{
 		if (TypeName const* concrete = std::get_if<TypeName>(&fi.type))
@@ -91,12 +107,40 @@ size_t TemplateTypeInfo::minAlign() const
 			}
 		}
 	}
+
 	return align;
 }
 
 size_t TemplateTypeInfo::minSize() const
 {
 	size_t size = 0;
+
+	// Walk parents
+	for (const auto& p : parents)
+	{
+		TypeName const* concrete = std::get_if<TypeName>(&p.type);
+		if (concrete)
+		{
+			TypeInfo const* concreteFullType = concrete->resolve();
+			assert(concreteFullType);
+			if (concreteFullType)
+			{
+				size_t align = concreteFullType->layout.align;
+				if (size & (align - 1))
+				{
+					// Fixup alignment
+					// Assumes power of two
+					size = size & ~(align - 1);
+					size += align;
+				}
+				size += concreteFullType->layout.size;
+			}
+			else size++; // Unloaded/incomplete type: must be at least one byte
+		}
+		else size++; // Template type: must be at least one byte
+	}
+
+	// Walk fields
 	for (const auto& fi : fields)
 	{
 		TypeName const* concrete = std::get_if<TypeName>(&fi.type);
@@ -120,18 +164,19 @@ size_t TemplateTypeInfo::minSize() const
 		}
 		else size++; // Template type: must be at least one byte
 	}
+
 	return std::max(size, (size_t)1);
 }
 
 const TypeTemplateParam& TemplateTypeInfo::addTypeParam(const std::string& name)
 {
-	return std::get<TypeTemplateParam>(
-		templateParams.emplace_back(TypeTemplateParam{ name })
-	);
+	return addTypeParam(name, nullptr);
 }
 
 const TypeTemplateParam& TemplateTypeInfo::addTypeParam(const std::string& name, const TypeInfo* defaultValue)
 {
+	assert(std::find_if(templateParams.begin(), templateParams.end(), [&](const TemplateParam& i) { return getName(i) == name; }) == templateParams.end());
+
 	return std::get<TypeTemplateParam>(
 		templateParams.emplace_back(TypeTemplateParam{ name, defaultValue })
 	);

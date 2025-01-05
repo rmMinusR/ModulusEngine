@@ -25,5 +25,5 @@ using TemplateParamValue = std::variant<_XM_FOREACH_TEMPLATE_PARAM_TYPE(_GET_VAL
 #undef _EXPAND
 #undef _GET_VALUE
 
-STIX_API std::string getName(const TemplateParam&);
-STIX_API std::string getName(const TemplateParamValue&);
+STIX_API std::string_view getName(const TemplateParam&);
+STIX_API std::string_view getName(const TemplateParamValue&);
