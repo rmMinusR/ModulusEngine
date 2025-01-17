@@ -14,4 +14,5 @@ doctest_discover_tests(engine-memory-test)
 
 stix_use_template(engine-memory-test "${CMAKE_CURRENT_LIST_DIR}/target/rtti.template.cpp")
 stix_default_image_capture_status(engine-memory-test disabled)
-stix_generate_reflection(engine-memory-test "${CMAKE_CURRENT_LIST_DIR}/target")
+stix_extract_ast(engine-memory-test "${CMAKE_CURRENT_LIST_DIR}/target")
+stix_generate_reflection(engine-memory-test)

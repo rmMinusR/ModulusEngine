@@ -216,13 +216,13 @@ public:
 	/// Is this type a class, struct, or union?
 	/// </summary>
 	/// <returns></returns>
-	ENGINE_RTTI_API bool isComposite() const;
+	STIX_API bool isComposite() const;
 
 	/// <summary>
 	/// Is this a fundamental type?
 	/// </summary>
 	/// <returns></returns>
-	ENGINE_RTTI_API bool isFundamental() const;
+	STIX_API bool isFundamental() const;
 
 	/// <summary>
 	/// INTERNAL USE ONLY. Currently used to finalize byteUsage, since we need to be able to look up our parents' fields.
