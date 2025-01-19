@@ -1,36 +1,33 @@
 #pragma once
 
 #include <vector>
+#include <optional>
+#include <functional>
 #include "../dllapi.h"
-#include "Component.hpp"
-#include "PoolCallBatcher.hpp"
+#include "Level.hpp"
+#include "TypedMemoryPool.hpp"
 
 class Application;
 class PluginManager;
 class GameObject;
 class InputSystem;
+class GameWindowRenderPipeline;
 
 class Game
 {
     Application* application;
     InputSystem* inputSystem;
 
-    std::vector<GameObject*> objects;
-    void applyConcurrencyBuffers();
-    std::vector<GameObject*> objectAddBuffer;
-    std::vector<GameObject*> objectDelBuffer;
-    std::vector<std::pair<Component*, GameObject*>> componentAddBuffer;
-    std::vector<Component*> componentDelBuffer;
-    friend class GameObject;
+    TypedMemoryPool<Level>* levels;
+    void applyConcurrencyBuffers(); //Passthrough for now
+    friend class GameWindowRenderPipeline;
+    
     friend class PluginManager;
-
-    PoolCallBatcher<IUpdatable> updateList;
-    PoolCallBatcher<I3DRenderable> _3dRenderList;
-
     void refreshCallBatchers(bool force = false);
 
-    void destroyImmediate(GameObject* go);
-    void destroyImmediate(Component* c);
+    //TODO allow accumulation from multiple heaps to allow collection from multiple levels
+    //PoolCallBatcher<IUpdatable> updateList;
+    //PoolCallBatcher<I3DRenderable> _3dRenderList;
 
     friend class Application;
     void init(Application* application);
@@ -45,10 +42,11 @@ public:
     int frame = 0;
 
 	ENGINECORE_API InputSystem* getInput();
-	ENGINECORE_API const PoolCallBatcher<I3DRenderable>* get3DRenderables() const;
+    ENGINECORE_API Application* getApplication() const;
 
-    ENGINECORE_API GameObject* addGameObject();
-    ENGINECORE_API void destroy(GameObject* go);
-
-    ENGINECORE_API inline Application* getApplication() const { return application; }
+	ENGINECORE_API void visitLevels(const std::function<void(Level*)>& visitor);
+	ENGINECORE_API Level* getLevel(size_t which);
+	ENGINECORE_API size_t getLevelCount() const;
+	ENGINECORE_API Level* addLevel();
+	ENGINECORE_API void removeLevel(Level* level);
 };

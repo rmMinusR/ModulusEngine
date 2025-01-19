@@ -2,6 +2,8 @@
 
 #include <cassert>
 
+#include "MemoryHeap.hpp"
+
 std::optional<MemoryRoot> MemoryRoot::instance;
 
 MemoryRoot* MemoryRoot::get()
@@ -27,6 +29,11 @@ MemoryRoot::~MemoryRoot()
 void MemoryRoot::visitHeaps(const std::function<void(MemoryHeap*)>& visitor)
 {
 	for (MemoryHeap* heap : livingHeaps) visitor(heap);
+}
+
+void MemoryRoot::ensureFresh()
+{
+	for (MemoryHeap* heap : livingHeaps) heap->ensureFresh();
 }
 
 void MemoryRoot::registerHeap(MemoryHeap* heap)

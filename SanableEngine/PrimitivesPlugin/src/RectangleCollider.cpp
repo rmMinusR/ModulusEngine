@@ -3,6 +3,8 @@
 #include "math/Vector3.inl"
 #include "game/Game.hpp"
 #include "game/GameObject.hpp"
+#include "MemoryRoot.hpp"
+#include "MemoryHeap.hpp"
 
 #undef min
 #undef max
@@ -49,18 +51,27 @@ bool RectangleCollider::CheckCollision(RectangleCollider const* other) const
 
 bool RectangleCollider::CheckCollisionAny() const
 {
-	TypedMemoryPool<RectangleCollider>* pool = getEngine()->getApplication()->getLevelHeap()->getSpecificPool<RectangleCollider>(false);
-	for (auto it = ((RawMemoryPool*)pool)->cbegin(); it != ((RawMemoryPool*)pool)->cend(); ++it)
+	bool overlappedAny = false;
+	MemoryRoot::get()->visitHeaps([&](MemoryHeap* heap)
 	{
-		if (*it != this && CheckCollision((RectangleCollider*)*it)) return true;
-	}
-	return false;
+		if (overlappedAny) return; //Nothing to do: halt early
+		TypedMemoryPool<RectangleCollider>* pool = heap->getSpecificPool<RectangleCollider>(false);
+		for (auto it = ((RawMemoryPool*)pool)->cbegin(); it != ((RawMemoryPool*)pool)->cend(); ++it)
+		{
+			if (*it != this && CheckCollision((RectangleCollider*)*it))
+			{
+				overlappedAny = true;
+				return;
+			}
+		}
+	});
+	return overlappedAny;
 }
 
 int RectangleCollider::GetCollisions(RectangleCollider** outArr) const
 {
 	int nHits = 0;
-	TypedMemoryPool<RectangleCollider>* pool = getEngine()->getApplication()->getLevelHeap()->getSpecificPool<RectangleCollider>(false);
+	TypedMemoryPool<RectangleCollider>* pool = getGameObject()->getLevel()->getHeap()->getSpecificPool<RectangleCollider>(false);
 	for (auto it = pool->cbegin(); it != pool->cend(); ++it)
 	{
 		RectangleCollider* c = &*it;

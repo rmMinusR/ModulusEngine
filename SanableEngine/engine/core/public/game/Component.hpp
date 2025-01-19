@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../dllapi.h"
-
 #include "GameObject.hpp"
 
 class ModuleTypeRegistry;
@@ -16,13 +14,13 @@ protected:
 	ENGINECORE_API virtual void BindToGameObject(GameObject* obj);
 	friend class GameObject;
 
-	ENGINECORE_API inline Game* getEngine() const { return gameObject->engine; }
+	ENGINECORE_API inline Game* getEngine() const;
 
 public:
 	ENGINECORE_API Component();
 	ENGINECORE_API virtual ~Component();
 
-	ENGINECORE_API inline GameObject* getGameObject() const { return gameObject; }
+	ENGINECORE_API GameObject* getGameObject() const;
 	ENGINECORE_API virtual void onStart();
 };
 
@@ -30,12 +28,14 @@ public:
 //Interfaces
 
 class Game;
+class Level;
 
 class IUpdatable
 {
 protected:
 	virtual void Update() = 0;
 	friend class Game;
+	friend class Level;
 public:
 	ENGINECORE_API virtual ~IUpdatable();
 };

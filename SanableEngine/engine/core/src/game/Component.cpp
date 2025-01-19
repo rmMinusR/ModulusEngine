@@ -4,12 +4,23 @@
 
 #include "application/Application.hpp"
 #include "game/GameObject.hpp"
+#include "game/Level.hpp"
 #include "Material.hpp"
 
 void Component::BindToGameObject(GameObject* obj)
 {
 	assert(gameObject == nullptr);
 	gameObject = obj;
+}
+
+Game* Component::getEngine() const
+{
+	return gameObject->getLevel()->getGame();
+}
+
+GameObject* Component::getGameObject() const
+{
+	return gameObject;
 }
 
 Component::Component() :

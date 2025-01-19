@@ -9,8 +9,7 @@
 #include "GlobalTypeRegistry.hpp"
 #include "application/Window.hpp"
 #include "game/Game.hpp"
-#include "MeshRenderer.hpp"
-#include "Camera.hpp"
+#include "MemoryRoot.hpp"
 
 void Application::processEvents()
 {
@@ -91,12 +90,9 @@ void Application::init(Game* game, const GLSettings& glSettings, WindowBuilder& 
         GlobalTypeRegistry::loadModule("Application", m);
     }
 
-    levelHeap.emplace();
-    levelHeap.value().getSpecificPool<GameObject>(true); //Force create GameObject pool now so it's owned by main module (avoiding nasty access violation errors)
-    levelHeap.value().getSpecificPool<Camera>(true); //Same with Camera
-    levelHeap.value().getSpecificPool<MeshRenderer>(true); //And MeshRenderer
-    levelHeap.value().ensureFresh();
-
+    heap.emplace();
+    heap.value().getSpecificPool<Level>(true);
+    
     this->game = game;
     game->init(this);
 
@@ -110,7 +106,7 @@ void Application::init(Game* game, const GLSettings& glSettings, WindowBuilder& 
     pluginManager.hookAll();
 
     if (userInitCallback) (*userInitCallback)(this);
-    levelHeap.value().ensureFresh();
+    heap.value().ensureFresh();
     game->refreshCallBatchers();
 }
 
@@ -123,20 +119,19 @@ void Application::shutdown()
     pluginManager.unhookAll(true); //FIXME: Pools destroyed automatically here, but Component and GameObject need to interface with Game
     game->applyConcurrencyBuffers();
     game->cleanup();
-    game->applyConcurrencyBuffers();
 
     //If any plugins didn't clean up their window, do it for them
     while (!windows.empty()) delete windows[windows.size()-1]; //Destructor will automatically erase the tail
     mainWindow = nullptr;
     
-    levelHeap.value().destroyPool<GameObject>(); //Clean up memory, GameObject pool first so remaining components are released
+    heap.value().destroyPool<GameObject>(); //Clean up memory, GameObject pool first so remaining components are released
     pluginManager.unloadAll(); //Unload plugin code, handling destructors of globals in module
 
     //RTTI and plugin info shouldn't appear on the leaks report
     GlobalTypeRegistry::clear();
     pluginManager.forgetAll();
 
-    levelHeap.reset(); //Finish cleaning up memory
+    heap.reset(); //Finish cleaning up memory
     system->Shutdown();
 }
 
@@ -158,7 +153,10 @@ void Application::frameStep(void* arg)
     engine->game->refreshCallBatchers(false);
     for (Window* w : engine->windows) w->draw();
 
-    if (engine->pluginManager.executeCommandBuffer() != 0) engine->levelHeap.value().ensureFresh();
+    if (engine->pluginManager.executeCommandBuffer() != 0)
+    {
+        MemoryRoot::get()->ensureFresh();
+    }
 }
 
 Game* Application::getGame() const
@@ -171,9 +169,9 @@ gpr460::System* Application::getSystem()
     return system;
 }
 
-MemoryHeap* Application::getLevelHeap()
+MemoryHeap* Application::getHeap()
 {
-    return &levelHeap.value();
+    return &heap.value();
 }
 
 StackAllocator* Application::getFrameAllocator()

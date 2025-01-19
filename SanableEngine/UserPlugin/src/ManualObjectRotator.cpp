@@ -17,7 +17,7 @@ void ManualObjectRotator::Update()
 {
 	Vector3<float> axis;
 	
-	InputSystem* input = getGameObject()->getContext()->getInput();
+	InputSystem* input = getGameObject()->getLevel()->getGame()->getInput();
 
 	//Calc input
 	if (input->getKey(SDL_SCANCODE_I)) axis += Vector3<float>(-1, 0, 0);

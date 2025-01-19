@@ -22,7 +22,7 @@ private:
 
     bool isAlive;
     gpr460::System* system;
-    std::optional<MemoryHeap> levelHeap; //Optional so we can do late initialization/early destruction
+    std::optional<MemoryHeap> heap; //Optional so we can do late initialization/early destruction
     StackAllocator frameAllocator; //Temp memory that will be reset every frame
     constexpr static size_t frameAllocatorSize = 4096;
     PluginManager pluginManager;
@@ -51,7 +51,7 @@ public:
 
     ENGINECORE_API Game* getGame() const;
     ENGINECORE_API gpr460::System* getSystem();
-    ENGINECORE_API MemoryHeap* getLevelHeap();
+    ENGINECORE_API MemoryHeap* getHeap();
     ENGINECORE_API StackAllocator* getFrameAllocator();
     ENGINECORE_API PluginManager* getPluginManager();
     ENGINECORE_API Window* getMainWindow();

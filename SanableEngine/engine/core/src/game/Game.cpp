@@ -5,13 +5,12 @@
 #include "game/GameObject.hpp"
 #include "game/Component.hpp"
 #include "game/InputSystem.hpp"
+#include "game/Level.hpp"
 
 Game::Game() :
     application(nullptr),
     inputSystem(nullptr),
-    isAlive(false),
-    updateList(),
-    _3dRenderList()
+    isAlive(false)
 {
 }
 
@@ -29,6 +28,8 @@ void Game::init(Application* application)
     frame = 0;
 
     this->inputSystem = new InputSystem();
+
+    levels = application->getHeap()->getSpecificPool<Level>(true);
 }
 
 void Game::cleanup()
@@ -36,74 +37,27 @@ void Game::cleanup()
     assert(isAlive);
     isAlive = false;
 
-    //Delete objects
-    applyConcurrencyBuffers();
-    for (GameObject* o : objects) destroy(o);
-    applyConcurrencyBuffers();
+    //application->getHeap()->destroyPool<Level>(); //Don't do this, it throws incorrect warnings
+    for (auto it = levels->cbegin(); it != levels->cend(); ++it) application->getHeap()->destroy(&*it);
+    levels = nullptr;
 
-    //Delete vector backing memory so it doesn't falsely appear as leaked
-    objects           .clear(); objects           .shrink_to_fit();
-    componentAddBuffer.clear(); componentAddBuffer.shrink_to_fit();
-    componentDelBuffer.clear(); componentDelBuffer.shrink_to_fit();
-    objectAddBuffer   .clear(); objectAddBuffer   .shrink_to_fit();
-    objectDelBuffer   .clear(); objectDelBuffer   .shrink_to_fit();
-    
     delete inputSystem;
 }
 
 void Game::applyConcurrencyBuffers()
 {
-    for (Component* c : componentDelBuffer) destroyImmediate(c);
-    componentDelBuffer.clear();
-
-    for (GameObject* go : objectDelBuffer) destroyImmediate(go);
-    objectDelBuffer.clear();
-
-    for (GameObject* go : objectAddBuffer)
+    for (auto it = levels->cbegin(); it != levels->cend(); ++it)
     {
-        objects.push_back(go);
-        go->InvokeStart();
+        it->applyConcurrencyBuffers();
     }
-    objectAddBuffer.clear();
-
-    for (auto& i : componentAddBuffer) i.second->BindComponent(i.first);
-    for (auto& i : componentAddBuffer) i.first->onStart();
-    componentAddBuffer.clear();
 }
 
 void Game::refreshCallBatchers(bool force)
 {
-    updateList   .ensureFresh(application->getLevelHeap(), force);
-    _3dRenderList.ensureFresh(application->getLevelHeap(), force);
-}
-
-GameObject* Game::addGameObject()
-{
-    GameObject* o = application->getLevelHeap()->create<GameObject>(this);
-    objectAddBuffer.push_back(o);
-    return o;
-}
-
-void Game::destroy(GameObject* go)
-{
-    objectDelBuffer.push_back(go);
-}
-
-void Game::destroyImmediate(GameObject* go)
-{
-    assert(std::find(objects.cbegin(), objects.cend(), go) != objects.cend());
-    objects.erase(std::find(objects.begin(), objects.end(), go));
-    application->getLevelHeap()->destroy(go);
-}
-
-void Game::destroyImmediate(Component* c)
-{
-    assert(std::find(objects.cbegin(), objects.cend(), c->getGameObject()) != objects.cend());
-    auto& l = c->getGameObject()->components;
-    auto it = std::find(l.cbegin(), l.cend(), c);
-    assert(it != l.cend());
-    l.erase(it);
-    application->getLevelHeap()->destroy(c);
+    for (auto it = levels->cbegin(); it != levels->cend(); ++it)
+    {
+        it->refreshCallBatchers(force);
+    }
 }
 
 void Game::tick()
@@ -111,10 +65,12 @@ void Game::tick()
     assert(isAlive);
 
     frame++;
-
-    applyConcurrencyBuffers();
-    inputSystem->onTick();
-    updateList.memberCall(&IUpdatable::Update);
+    
+    refreshCallBatchers();
+    for (auto it = levels->cbegin(); it != levels->cend(); ++it)
+    {
+        it->tick();
+    }
 }
 
 InputSystem* Game::getInput()
@@ -122,7 +78,35 @@ InputSystem* Game::getInput()
     return inputSystem;
 }
 
-const PoolCallBatcher<I3DRenderable>* Game::get3DRenderables() const
+Application* Game::getApplication() const
 {
-    return &_3dRenderList;
+    return application;
+}
+
+void Game::visitLevels(const std::function<void(Level*)>& visitor)
+{
+    for (auto it = levels->cbegin(); it != levels->cend(); ++it)
+    {
+        visitor(&*it);
+    }
+}
+
+Level* Game::getLevel(size_t which)
+{
+    return &*(levels->cbegin()+which);
+}
+
+size_t Game::getLevelCount() const
+{
+    return levels->asGeneric()->getNumAllocatedObjects();
+}
+
+Level* Game::addLevel()
+{
+    return levels->emplace(this);
+}
+
+void Game::removeLevel(Level* level)
+{
+    levels->release(level);
 }

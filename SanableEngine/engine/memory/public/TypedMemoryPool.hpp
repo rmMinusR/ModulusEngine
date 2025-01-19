@@ -15,7 +15,6 @@ class TypedMemoryPool
 	static_assert(!std::is_abstract_v<TObj>);
 
 private:
-	friend class MemoryHeap;
 	GenericTypedMemoryPool* impl;
 public:
 	TypedMemoryPool(GenericTypedMemoryPool* impl) : impl(impl) {}
@@ -36,6 +35,9 @@ public:
 	//Pass through
 	inline void release(TObj* obj) { impl->release(obj); }
 
+	inline GenericTypedMemoryPool* asGeneric() { return impl; }
+	inline GenericTypedMemoryPool const* asGeneric() const { return impl; }
+
 	//Pass through with type safety
 	class const_iterator
 	{
@@ -48,7 +50,9 @@ public:
 		inline TObj& operator*() const { return *reinterpret_cast<TObj*>(*inner); }
 		inline TObj* operator->() const { return reinterpret_cast<TObj*>(*inner); }
 
-		inline const_iterator operator++() { ++inner; return *this; }
+		inline const_iterator operator++()              { ++inner;         return *this; }
+		inline const_iterator operator+=(size_t offset) { inner += offset; return *this; }
+		inline const_iterator operator+(size_t offset) const { return const_iterator(*this) += offset; }
 
 		inline bool operator!=(const const_iterator& other) const { return inner != other.inner; }
 		inline bool operator==(const const_iterator& other) const { return inner == other.inner; }
@@ -81,9 +85,10 @@ public:
 	template<typename TObj>
 	[[nodiscard]] static GenericTypedMemoryPool* create(size_t maxNumObjects = 64)
 	{
+		const TypeInfo* existing = GlobalTypeRegistry::lookupType(TypeName::create<TObj>());
 		return new GenericTypedMemoryPool(
 			maxNumObjects,
-			TypeInfo::createDummy<TObj>() //No need to resolve dummy TypeInfo here. Engine will call refreshObjects after all TypeInfos are registered.
+			existing ? *existing : TypeInfo::createDummy<TObj>() //No need to resolve dummy TypeInfo here. Engine will call refreshObjects after all TypeInfos are registered.
 		);
 	}
 

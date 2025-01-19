@@ -17,7 +17,7 @@ class InputSystem
 	friend class Game;
 	void onTick();
 
-	uint8_t const* keyboardState;
+	mutable uint8_t const* keyboardState;
 	uint32_t mouseButtonState;
 	Vector3<int> mousePos;
 	Vector3<int> mouseDelta;

@@ -23,8 +23,8 @@ void GameObject::InvokeStart()
 	for (Component* c : components) c->onStart();
 }
 
-GameObject::GameObject(Game* engine) :
-	engine(engine)
+GameObject::GameObject(Level* level) :
+	level(level)
 {
 }
 
@@ -32,7 +32,7 @@ GameObject::~GameObject()
 {
 	if (components.size() != 0)
 	{
-		for (Component* c : components) engine->getApplication()->getLevelHeap()->destroy(c);
+		for (Component* c : components) level->getHeap()->destroy(c);
 		components.clear();
 	}
 }

@@ -18,7 +18,7 @@ void PlayerController::Update()
 {
 	Vector3<float> input;
 	
-	InputSystem* inputSystem = getGameObject()->getContext()->getInput();
+	InputSystem* inputSystem = getGameObject()->getLevel()->getGame()->getInput();
 	
 	//Move position
 	if (inputSystem->getKey(SDL_SCANCODE_A     )) input += Vector3<float>(-moveSpeed, 0, 0);

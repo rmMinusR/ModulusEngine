@@ -244,6 +244,17 @@ RawMemoryPool::const_iterator RawMemoryPool::const_iterator::operator++()
 	return *this;
 }
 
+RawMemoryPool::const_iterator RawMemoryPool::const_iterator::operator+=(size_t offset)
+{
+	for (size_t i = 0; i < offset; ++i) operator++();
+	return *this;
+}
+
+RawMemoryPool::const_iterator RawMemoryPool::const_iterator::operator+(size_t offset) const
+{
+	return const_iterator(*this) += offset;
+}
+
 RawMemoryPool::const_iterator RawMemoryPool::cbegin() const
 {
 	return const_iterator(this, 0);

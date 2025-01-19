@@ -3,10 +3,12 @@
 #include <unordered_map>
 #include <GL/glew.h>
 #include "game/Game.hpp"
+#include "game/Level.hpp"
 #include "application/Window.hpp"
 #include "Camera.hpp"
 #include "Material.hpp"
 #include "ShaderProgram.hpp"
+#include "MemoryRoot.hpp"
 
 GameWindowRenderPipeline::GameWindowRenderPipeline(Game* game) :
 	game(game),
@@ -40,11 +42,9 @@ void GameWindowRenderPipeline::render(Rect<float> viewport)
 			const Material*, //Then by material
 			std::vector<const I3DRenderable*>
 		>
-	> renderables; //Note: No need for a CallBatcher here, we're guaranteed renderables will be grouped by type since our data source is a CallBatcher
-	game->get3DRenderables()->staticCall([&](const I3DRenderable* r)
-	{
-		renderables[r->getShader()][r->getMaterial()].push_back(r);
-	});
+	> renderables; //Note: No need for a CallBatcher here, we're guaranteed renderables will be grouped by level, then type since our data source is a CallBatcher
+	auto registerRenderable = [&](const I3DRenderable* r) { renderables[r->getShader()][r->getMaterial()].push_back(r); };
+	game->visitLevels([&](Level* level) { level->get3DRenderables()->staticCall(registerRenderable); });
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();

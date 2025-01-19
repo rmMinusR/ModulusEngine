@@ -5,6 +5,8 @@
 
 InputSystem::InputSystem()
 {
+	int sz;
+	keyboardState = SDL_GetKeyboardState(&sz); //Managed by SDL, do not free
 }
 
 InputSystem::~InputSystem()
@@ -25,9 +27,6 @@ void InputSystem::onLoseFocus()
 
 void InputSystem::onTick()
 {
-	int sz;
-	keyboardState = SDL_GetKeyboardState(&sz); //Managed by SDL, do not free
-
 	Vector3<int> oldMousePos = mousePos;
 	mouseButtonState = SDL_GetMouseState(&mousePos.x, &mousePos.y);
 	mouseDelta = mousePos-oldMousePos;

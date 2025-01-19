@@ -11,7 +11,7 @@
 
 class ModuleTypeRegistry;
 class Component;
-class Game;
+class Level;
 
 class GameObject
 {
@@ -19,19 +19,19 @@ protected:
     Transform transform;
 
     std::vector<Component*> components;
-    friend class Game;
+    friend class Level;
     friend class Component;
 
-    Game* const engine;
+    Level* level;
 
     void BindComponent(Component* c);
     void InvokeStart();
 
 public:
-    GameObject(Game* engine);
+    GameObject(Level* level);
     ~GameObject();
 
-    inline Game* getContext() { return engine; }
+    inline Level* getLevel() { return level; }
 
     inline Transform* getTransform() { return &transform; }
 
@@ -40,8 +40,8 @@ public:
     {
         T* component;
         assert((component = GetComponent<T>()) == nullptr);
-        component = engine->getApplication()->getLevelHeap()->create<T>(ctorArgs...);
-        engine->componentAddBuffer.push_back(std::pair<Component*, GameObject*>(component, this));
+        component = level->getHeap()->create<T>(ctorArgs...);
+        level->componentAddBuffer.push_back(std::pair<Component*, GameObject*>(component, this));
         return component;
     }
 

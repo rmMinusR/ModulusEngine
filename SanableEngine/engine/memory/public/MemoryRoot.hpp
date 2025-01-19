@@ -22,6 +22,7 @@ public:
 	ENGINEMEM_API static void cleanup();
 	
 	ENGINEMEM_API void visitHeaps(const std::function<void(MemoryHeap*)>& visitor);
+	ENGINEMEM_API void ensureFresh();
 	
 private:
 	static std::optional<MemoryRoot> instance;

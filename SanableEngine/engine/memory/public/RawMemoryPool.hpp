@@ -91,6 +91,8 @@ public:
 		ENGINEMEM_API void* operator*() const;
 
 		ENGINEMEM_API const_iterator operator++();
+		ENGINEMEM_API const_iterator operator+=(size_t offset);
+		ENGINEMEM_API const_iterator operator+(size_t offset) const;
 
 		ENGINEMEM_API inline bool operator!=(const const_iterator& other) const { return pool == other.pool && index != other.index; }
 		ENGINEMEM_API inline bool operator==(const const_iterator& other) const { return pool == other.pool && index == other.index; }

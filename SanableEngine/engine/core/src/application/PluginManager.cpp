@@ -10,6 +10,8 @@
 #include "System.hpp"
 #include "game/Game.hpp"
 #include "game/GameObject.hpp"
+#include "MemoryRoot.hpp"
+#include "MemoryHeap.hpp"
 
 PluginManager::PluginManager(Application* engine) :
 	engine(engine)
@@ -124,7 +126,7 @@ void PluginManager::reloadAll()
 	loadAll();
 
     std::cout << "Refreshing object layouts and vtables...\n";
-	engine->getLevelHeap()->ensureFresh();
+	MemoryRoot::get()->ensureFresh();
 
     std::cout << "Refreshing pointers... (call batchers)\n";
 	engine->getGame()->refreshCallBatchers(true);
