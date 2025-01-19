@@ -153,9 +153,11 @@ bool TypeName::isValid() const
     return !name.empty();
 }
 
-TypeInfo const* TypeName::resolve() const
+TypeInfo const* TypeName::resolve(ModuleTypeRegistry* moduleHint) const
 {
-    return GlobalTypeRegistry::lookupType(*this);
+    TypeInfo const* out = nullptr;
+    if (moduleHint && ( out = moduleHint->lookupType(*this) )) return out; // Try hinted TU first
+    return GlobalTypeRegistry::lookupType(*this); // Then try all
 }
 
 bool TypeName::operator==(const TypeName& other) const

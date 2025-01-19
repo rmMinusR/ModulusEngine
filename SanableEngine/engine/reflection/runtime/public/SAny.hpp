@@ -20,12 +20,12 @@ namespace stix
 		friend class ::stix::MemberFunction;
 		friend class ::stix::StaticFunction;
 
-		ENGINE_RTTI_API void* get_internal(const TypeName& asType) const;
-		ENGINE_RTTI_API void* get_unchecked() const;
-		ENGINE_RTTI_API SAnyRef(void* data, const TypeName& type);
+		STIX_API void* get_internal(const TypeName& asType) const;
+		STIX_API void* get_unchecked() const;
+		STIX_API SAnyRef(void* data, const TypeName& type);
 	public:
-		ENGINE_RTTI_API SAnyRef();
-		ENGINE_RTTI_API ~SAnyRef();
+		STIX_API SAnyRef();
+		STIX_API ~SAnyRef();
 
 		template<typename T>
 		static SAnyRef make(T* obj)
@@ -34,12 +34,12 @@ namespace stix
 			return SAnyRef(obj, TypeName::create<T>()); //TODO attempt to snipe RTTI and checK, just to be sure? Casting should handle most of it though.
 		}
 
-		ENGINE_RTTI_API TypeName getType() const;
+		STIX_API TypeName getType() const;
 		template<typename T>
 		std::remove_reference_t<T>& get() const { return *(std::remove_reference_t<T>*)get_internal(TypeName::tryCreate<T>()); }
 
-		ENGINE_RTTI_API operator bool() const;
-		ENGINE_RTTI_API bool has_value() const;
+		STIX_API operator bool() const;
+		STIX_API bool has_value() const;
 
 		//Allow copy and move
 		SAnyRef(const SAnyRef& cpy) = default;

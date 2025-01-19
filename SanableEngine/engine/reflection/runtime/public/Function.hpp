@@ -18,7 +18,7 @@ namespace stix
 		TypeName returnType;
 		std::vector<TypeName> parameters;
 
-		ENGINE_RTTI_API virtual ~Function();
+		STIX_API virtual ~Function();
 	protected:
 		Function(const TypeName& returnType, const std::vector<TypeName>& parameters);
 	};
@@ -26,14 +26,14 @@ namespace stix
 	class MemberFunction : public Function
 	{
 	public:
-		ENGINE_RTTI_API virtual ~MemberFunction();
-		ENGINE_RTTI_API void invoke(SAnyRef returnValue, const SAnyRef& thisObj, const std::vector<SAnyRef>& parameters) const;
+		STIX_API virtual ~MemberFunction();
+		STIX_API void invoke(SAnyRef returnValue, const SAnyRef& thisObj, const std::vector<SAnyRef>& parameters) const;
 	
 		template<typename TReturn, typename TOwner, typename... TArgs> static MemberFunction make(TReturn(TOwner::* fn)(TArgs...)      ) { return make_internal(fn, false); }
 		template<typename TReturn, typename TOwner, typename... TArgs> static MemberFunction make(TReturn(TOwner::* fn)(TArgs...) const) { return make_internal( (TReturn(TOwner::*)(TArgs...)) fn, true); }
 
 	protected:
-		ENGINE_RTTI_API MemberFunction(const TypeName& owner, bool ownerIsConst, const TypeName& returnType, const std::vector<TypeName>& parameters,
+		STIX_API MemberFunction(const TypeName& owner, bool ownerIsConst, const TypeName& returnType, const std::vector<TypeName>& parameters,
 			                           detail::CallableUtils::Member::fully_erased_binder_t binder, detail::CallableUtils::Member::erased_fp_t fn);
 
 		template<typename TReturn, typename TOwner, typename... TArgs>
@@ -64,8 +64,8 @@ namespace stix
 	class StaticFunction : public Function
 	{
 	public:
-		ENGINE_RTTI_API virtual ~StaticFunction();
-		ENGINE_RTTI_API void invoke(SAnyRef returnValue, const std::vector<SAnyRef>& parameters) const;
+		STIX_API virtual ~StaticFunction();
+		STIX_API void invoke(SAnyRef returnValue, const std::vector<SAnyRef>& parameters) const;
 
 		template<typename TReturn, typename... TArgs>
 		static StaticFunction make(TReturn(*fn)(TArgs...))
@@ -82,7 +82,7 @@ namespace stix
 		}
 	
 	protected:
-		ENGINE_RTTI_API StaticFunction(const TypeName& returnType, const std::vector<TypeName>& parameters,
+		STIX_API StaticFunction(const TypeName& returnType, const std::vector<TypeName>& parameters,
 			                           detail::CallableUtils::Static::fully_erased_binder_t binder, detail::CallableUtils::Static::erased_fp_t fn);
 
 		//All SAnyRefs guaranteed valid when called

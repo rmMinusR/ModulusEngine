@@ -22,5 +22,5 @@ struct ParentInfo : public MemberInfo
 	Virtualness virtualness;
 
 	ParentInfo(size_t size, ptrdiff_t offset, const TypeName& owner, const TypeName& typeName, MemberVisibility visibility, Virtualness virtualness);
-	ENGINE_RTTI_API static ParentInfo identity(const TypeName& ty, size_t sz);
+	STIX_API static ParentInfo identity(const TypeName& ty, size_t sz);
 };

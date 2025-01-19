@@ -95,9 +95,8 @@ function(declare_plugin name sources_var)
     install_dll(${name} "plugins/${name}")
     SET(sanableAllPlugins ${sanableAllPlugins} ${name} PARENT_SCOPE)
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        stix_generate_reflection(${name} ${CMAKE_CURRENT_LIST_DIR})
-    endif()
+    stix_extract_ast(${name} ${CMAKE_CURRENT_LIST_DIR})
+    stix_generate_reflection(${name})
 endfunction()
 
 function(export_resource libTarget fileRelPath)

@@ -5,20 +5,22 @@
 struct GLSettings
 {
 	//Default: v3.1 (latest with fixed-function pipeline)
-	struct
+	struct Version
 	{
 		int major = 3;
 		int minor = 1;
-	} version;
+	};
+	Version version;
 
 	//Default: RGBA8 color
-	struct
+	struct ColorBitsMin
 	{
 		int r = 8;
 		int g = 8;
 		int b = 8;
 		int a = 8;
-	} colorBitsMin;
+	};
+	ColorBitsMin colorBitsMin;
 
 	//Default: 16-bit depth
 	int depthBitsMin = 16;
