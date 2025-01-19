@@ -226,6 +226,8 @@ RawMemoryPool::const_iterator::const_iterator(RawMemoryPool const* pool, id_t in
 	pool(pool),
 	index(index)
 {
+	//Skip any IDs that aren't alive
+	while (this->index < pool->mMaxNumObjects && !pool->isAliveById(this->index)) this->index++;
 }
 
 void* RawMemoryPool::const_iterator::operator*() const

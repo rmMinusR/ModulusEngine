@@ -92,10 +92,6 @@ void Application::init(Game* game, const GLSettings& glSettings, WindowBuilder& 
     }
 
     levelHeap.emplace();
-    levelHeap.value().getSpecificPool<GameObject>(true); //Force create GameObject pool now so it's owned by main module (avoiding nasty access violation errors)
-    levelHeap.value().getSpecificPool<Camera>(true); //Same with Camera
-    levelHeap.value().getSpecificPool<MeshRenderer>(true); //And MeshRenderer
-    levelHeap.value().ensureFresh();
 
     this->game = game;
     game->init(this);

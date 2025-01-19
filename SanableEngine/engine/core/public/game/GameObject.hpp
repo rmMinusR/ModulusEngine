@@ -22,7 +22,7 @@ protected:
     friend class Game;
     friend class Component;
 
-    Game* const engine;
+    Game* engine = nullptr;
 
     void BindComponent(Component* c);
     void InvokeStart();
