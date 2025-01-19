@@ -21,7 +21,6 @@ namespace stix
 		friend class ::stix::StaticFunction;
 
 		STIX_API void* get_internal(const TypeName& asType) const;
-		STIX_API void* get_unchecked() const;
 		STIX_API SAnyRef(void* data, const TypeName& type);
 	public:
 		STIX_API SAnyRef();
@@ -34,7 +33,10 @@ namespace stix
 			return SAnyRef(obj, TypeName::create<T>()); //TODO attempt to snipe RTTI and checK, just to be sure? Casting should handle most of it though.
 		}
 
+		static SAnyRef makeUnsafe(void* obj, TypeName type) { return SAnyRef(obj, type); }
+
 		STIX_API TypeName getType() const;
+		STIX_API void* getUnsafe() const;
 		template<typename T>
 		std::remove_reference_t<T>& get() const { return *(std::remove_reference_t<T>*)get_internal(TypeName::tryCreate<T>()); }
 

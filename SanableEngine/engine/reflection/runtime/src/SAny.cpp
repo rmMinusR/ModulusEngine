@@ -10,6 +10,11 @@ void* stix::SAnyRef::get_internal(const TypeName& asType) const
 	return data;
 }
 
+void* stix::SAnyRef::getUnsafe() const
+{
+	return data;
+}
+
 stix::SAnyRef::SAnyRef(void* data, const TypeName& type) :
 	data(data),
 	type(type)

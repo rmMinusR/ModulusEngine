@@ -75,3 +75,12 @@ void MemoryRoot::removeExternal(void* object)
 	auto it = externalObjects.find(object);
 	externalObjects.erase(it);
 }
+
+void MemoryRoot::visitExternals(const std::function<void(stix::SAnyRef, ExternalObjectOptions)>& visitor)
+{
+	for (const auto& kv : externalObjects)
+	{
+		stix::SAnyRef typedRef = stix::SAnyRef::makeUnsafe(kv.first, std::get<0>(kv.second));
+		visitor(typedRef, std::get<2>(kv.second));
+	}
+}

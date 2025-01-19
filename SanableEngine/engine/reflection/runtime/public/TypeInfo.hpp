@@ -152,7 +152,7 @@ public:
 
 		struct DestructorRecord
 		{
-			std::optional<stix::MemberFunction> ctor; //nullopt if we couldn't capture it
+			std::optional<stix::MemberFunction> thunk; //nullopt if we couldn't capture it
 			MemberVisibility visibility;
 			bool isVirtual;
 		};

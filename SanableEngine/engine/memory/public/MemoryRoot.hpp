@@ -6,6 +6,8 @@
 #include <set>
 #include <functional>
 
+#include <SAny.hpp>
+
 #include "dllapi.h"
 
 #include "ExternalObject.hpp"
@@ -35,6 +37,7 @@ public:
 		registerExternal_impl(object, std::move(TypeName::create<T>()), sizeof(T), options);
 	}
 	ENGINEMEM_API void removeExternal(void* object);
+	ENGINEMEM_API void visitExternals(const std::function<void(stix::SAnyRef, ExternalObjectOptions)>& visitor);
 
 private:
 	static std::optional<MemoryRoot> instance;
